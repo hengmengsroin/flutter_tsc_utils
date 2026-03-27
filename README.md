@@ -82,6 +82,22 @@ Future<void> printKhmer() async {
 }
 ```
 
+## Example App
+
+A Flutter example app is included in [example/lib/main.dart](/Users/hengmengsroin/Documents/projects/flutter-plugins/flutter_tsc_utils/example/lib/main.dart). It provides:
+
+- A live label preview
+- A TSPL command preview
+- A Khmer text demo using `khmerText()`
+
+Run it with:
+
+```bash
+cd example
+flutter pub get
+flutter run
+```
+
 ## Notes
 
 - TSC models vary a bit in supported commands, fonts, and barcode types.

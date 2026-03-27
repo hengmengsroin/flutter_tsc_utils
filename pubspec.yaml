@@ -1,6 +1,6 @@
 name: flutter_tsc_utils
 description: Utilities for generating TSC TSPL/TSPL2 printer commands from Flutter and Dart.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/hengmengsroin/flutter_tsc_utils
 repository: https://github.com/hengmengsroin/flutter_tsc_utils
 issue_tracker: https://github.com/hengmengsroin/flutter_tsc_utils/issues

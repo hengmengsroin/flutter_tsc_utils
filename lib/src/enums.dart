@@ -8,6 +8,16 @@ enum TscUnit {
   final String suffix;
 }
 
+enum TscMemory {
+  dram(''),
+  flash('F'),
+  expansion('E');
+
+  const TscMemory(this.value);
+
+  final String value;
+}
+
 enum TscToggle {
   on('ON'),
   off('OFF');
@@ -196,4 +206,64 @@ enum TscDataMatrixShape {
   const TscDataMatrixShape(this.value);
 
   final int value;
+}
+
+enum TscImageFit { contain, cover, fill, none, scaleDown }
+
+enum TscAnchor {
+  topLeft,
+  topCenter,
+  topRight,
+  centerLeft,
+  center,
+  centerRight,
+  bottomLeft,
+  bottomCenter,
+  bottomRight,
+}
+
+enum TscSelfTestPage {
+  full(''),
+  pattern('PATTERN'),
+  ethernet('ETHERNET'),
+  wlan('WLAN'),
+  rs232('RS232'),
+  system('SYSTEM'),
+  emulation('Z'),
+  bluetooth('BT');
+
+  const TscSelfTestPage(this.value);
+
+  final String value;
+}
+
+enum TscImmediateStatusCode {
+  normal(0x00),
+  headOpen(0x01),
+  paperJam(0x02),
+  paperJamHeadOpen(0x03),
+  outOfPaper(0x04),
+  outOfPaperHeadOpen(0x05),
+  outOfRibbon(0x08),
+  outOfRibbonHeadOpen(0x09),
+  outOfRibbonPaperJam(0x0A),
+  outOfRibbonPaperJamHeadOpen(0x0B),
+  outOfRibbonOutOfPaper(0x0C),
+  outOfRibbonOutOfPaperHeadOpen(0x0D),
+  pause(0x10),
+  printing(0x20),
+  otherError(0x80);
+
+  const TscImmediateStatusCode(this.value);
+
+  final int value;
+
+  static TscImmediateStatusCode? fromByte(int value) {
+    for (final code in values) {
+      if (code.value == value) {
+        return code;
+      }
+    }
+    return null;
+  }
 }

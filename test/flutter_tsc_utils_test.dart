@@ -140,6 +140,54 @@ void main() {
     expect(latin1.decode(bytes.sublist(bytes.length - 2)), '\r\n');
   });
 
+  test('layout sections support rows, padding, and anchors', () {
+    final layout = TscLabelLayout(
+      width: 600,
+      height: 400,
+      padding: const TscPadding.all(20),
+    );
+
+    final rows = layout.rows([50, 80], spacing: 10);
+    final anchored = layout.anchor(100, 40, anchor: TscAnchor.bottomRight);
+
+    expect(rows[0].x, 20);
+    expect(rows[0].y, 20);
+    expect(rows[0].width, 560);
+    expect(rows[1].y, 80);
+    expect(anchored.x, 480);
+    expect(anchored.y, 340);
+  });
+
+  test('image helper contain fit centers resized image in target box', () {
+    final source = img.Image(width: 100, height: 50);
+    img.fill(source, color: img.ColorRgb8(0, 0, 0));
+
+    final fitted = TscImageHelper.fitInto(
+      source,
+      boxWidth: 200,
+      boxHeight: 200,
+      fit: TscImageFit.contain,
+    );
+
+    expect(fitted.image.width, 200);
+    expect(fitted.image.height, 200);
+    expect(fitted.image.getPixel(100, 100).r, 0);
+    expect(fitted.image.getPixel(100, 20).r, 255);
+  });
+
+  test('bitmapFitted generates TSPL bitmap for a target rect', () {
+    final source = img.Image(width: 20, height: 10);
+    img.fill(source, color: img.ColorRgb8(0, 0, 0));
+
+    final generator = TscGenerator()
+      ..bitmapFitted(const TscRect(30, 40, 60, 60), source);
+
+    expect(
+      _asciiPrefix(generator.build(), maxLength: 64),
+      'BITMAP 30,40,8,60,0,',
+    );
+  });
+
   test('khmerText renders text through bitmap output', () async {
     final generator = TscGenerator();
 
@@ -178,6 +226,66 @@ void main() {
       () => TscGenerator().setCutter(batch: true, every: 2),
       throwsA(isA<ArgumentError>()),
     );
+    expect(
+      () => TscGenerator().downloadProgramStart('demo.txt'),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
+  test('supports file management and immediate query commands', () {
+    const expectedPreview =
+        'FORMFEED\r\n'
+        'SELFTEST PATTERN\r\n'
+        'FILES\r\n'
+        'DOWNLOAD F,"AUTO.BAS"\r\n'
+        'EOP\r\n'
+        'DOWNLOAD "LOGO.TXT",3,ABC\r\n'
+        'KILL F,"OLD.BAS"\r\n'
+        'MOVE "TMP.BAS",F,"AUTO.BAS"\r\n'
+        'RUN "AUTO.BAS"\r\n';
+
+    final generator = TscGenerator()
+      ..formFeed()
+      ..selfTest(page: TscSelfTestPage.pattern)
+      ..files()
+      ..downloadProgramStart('AUTO.BAS', memory: TscMemory.flash)
+      ..eop()
+      ..downloadDataString('LOGO.TXT', 'ABC', memory: TscMemory.dram)
+      ..kill('OLD.BAS', memory: TscMemory.flash)
+      ..move(
+        'TMP.BAS',
+        'AUTO.BAS',
+        fromMemory: TscMemory.dram,
+        toMemory: TscMemory.flash,
+      )
+      ..run('AUTO.BAS')
+      ..statusPoll()
+      ..statusPollPrinter()
+      ..queryFileList()
+      ..queryPrinterModel()
+      ..queryCodePageAndCountry();
+
+    final bytes = generator.build();
+    final preview = latin1.decode(bytes.sublist(0, expectedPreview.length));
+
+    expect(preview, expectedPreview);
+    expect(bytes.sublist(expectedPreview.length), <int>[
+      0x1B,
+      0x21,
+      0x3F,
+      0x1B,
+      0x21,
+      0x53,
+      0x7E,
+      0x21,
+      0x46,
+      0x7E,
+      0x21,
+      0x54,
+      0x7E,
+      0x21,
+      0x49,
+    ]);
   });
 }
 

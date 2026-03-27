@@ -7,7 +7,9 @@ import 'package:image/image.dart' as img;
 
 import 'commands.dart';
 import 'enums.dart';
+import 'image_helpers.dart';
 import 'label_size.dart';
+import 'layout.dart';
 import 'options.dart';
 import 'rendered_text_options.dart';
 import 'text_style.dart';
@@ -105,6 +107,8 @@ class TscGenerator {
     return rawCommand('BACKFEED $dots');
   }
 
+  TscGenerator formFeed() => rawCommand('FORMFEED');
+
   TscGenerator home() => rawCommand('HOME');
 
   TscGenerator sound(int level, int interval) {
@@ -114,6 +118,80 @@ class TscGenerator {
   }
 
   TscGenerator cut() => rawCommand('CUT');
+
+  TscGenerator selfTest({TscSelfTestPage page = TscSelfTestPage.full}) {
+    final suffix = page.value.isEmpty ? '' : ' ${page.value}';
+    return rawCommand('SELFTEST$suffix');
+  }
+
+  TscGenerator files() => rawCommand('FILES');
+
+  TscGenerator downloadProgramStart(
+    String filename, {
+    TscMemory memory = TscMemory.dram,
+  }) {
+    _validateProgramFilename(filename);
+    final args = <String>[
+      if (memory != TscMemory.dram) memory.value,
+      quoteTsc(filename),
+    ];
+    return rawCommand('DOWNLOAD ${args.join(',')}');
+  }
+
+  TscGenerator downloadData(
+    String filename,
+    List<int> data, {
+    TscMemory memory = TscMemory.dram,
+  }) {
+    _validateDataFilename(filename);
+    final headerParts = <String>[
+      if (memory != TscMemory.dram) memory.value,
+      quoteTsc(filename),
+      '${data.length}',
+    ];
+    _commands.addEncodedText('DOWNLOAD ${headerParts.join(',')},');
+    _commands.addRawBytes(data);
+    _commands.addEncodedText(newLine);
+    return this;
+  }
+
+  TscGenerator downloadDataString(
+    String filename,
+    String data, {
+    TscMemory memory = TscMemory.dram,
+  }) {
+    return downloadData(filename, codec.encode(data), memory: memory);
+  }
+
+  TscGenerator eop() => rawCommand('EOP');
+
+  TscGenerator kill(String filename, {TscMemory? memory}) {
+    _validateDataFilename(filename);
+    final args = <String>[if (memory != null) memory.value, quoteTsc(filename)];
+    return rawCommand('KILL ${args.join(',')}');
+  }
+
+  TscGenerator move(
+    String sourceFilename,
+    String targetFilename, {
+    TscMemory? fromMemory,
+    TscMemory? toMemory,
+  }) {
+    _validateDataFilename(sourceFilename);
+    _validateDataFilename(targetFilename);
+    final source = fromMemory == null || fromMemory == TscMemory.dram
+        ? quoteTsc(sourceFilename)
+        : '${fromMemory.value},${quoteTsc(sourceFilename)}';
+    final target = toMemory == null || toMemory == TscMemory.dram
+        ? quoteTsc(targetFilename)
+        : '${toMemory.value},${quoteTsc(targetFilename)}';
+    return rawCommand('MOVE $source,$target');
+  }
+
+  TscGenerator run(String filename) {
+    _validateProgramFilename(filename);
+    return rawCommand('RUN ${quoteTsc(filename)}');
+  }
 
   TscGenerator setPeel(TscToggle value) =>
       rawCommand('SET PEEL ${value.value}');
@@ -399,6 +477,34 @@ class TscGenerator {
     return this;
   }
 
+  TscGenerator bitmapFitted(
+    TscRect rect,
+    img.Image image, {
+    TscImageFit fit = TscImageFit.contain,
+    TscAnchor anchor = TscAnchor.center,
+    TscBitmapMode mode = TscBitmapMode.overwrite,
+    int threshold = 127,
+    int backgroundColor = 0xFFFFFFFF,
+    bool allowUpscale = true,
+  }) {
+    final fitted = TscImageHelper.fitInto(
+      image,
+      boxWidth: rect.width,
+      boxHeight: rect.height,
+      fit: fit,
+      anchor: anchor,
+      backgroundColor: backgroundColor,
+      allowUpscale: allowUpscale,
+    );
+    return bitmap(
+      rect.x,
+      rect.y,
+      fitted.image,
+      mode: mode,
+      threshold: threshold,
+    );
+  }
+
   Future<TscGenerator> khmerText(
     int x,
     int y,
@@ -419,6 +525,31 @@ class TscGenerator {
     requirePositive(copies, 'copies');
     requirePositive(sets, 'sets');
     return rawCommand('PRINT $sets,$copies');
+  }
+
+  TscGenerator statusPoll() {
+    _commands.addRawBytes(const [0x1B, 0x21, 0x3F]);
+    return this;
+  }
+
+  TscGenerator statusPollPrinter() {
+    _commands.addRawBytes(const [0x1B, 0x21, 0x53]);
+    return this;
+  }
+
+  TscGenerator queryPrinterModel() {
+    _commands.addRawBytes(ascii.encode('~!T'));
+    return this;
+  }
+
+  TscGenerator queryFileList() {
+    _commands.addRawBytes(ascii.encode('~!F'));
+    return this;
+  }
+
+  TscGenerator queryCodePageAndCountry() {
+    _commands.addRawBytes(ascii.encode('~!I'));
+    return this;
   }
 
   TscGenerator _setCutCommand({
@@ -447,6 +578,23 @@ class TscGenerator {
   void _validateTextStyle(TscTextStyle style) {
     requireRange(style.xMultiplier, 1, 10, 'style.xMultiplier');
     requireRange(style.yMultiplier, 1, 10, 'style.yMultiplier');
+  }
+
+  void _validateProgramFilename(String filename) {
+    _validateDataFilename(filename);
+    if (!filename.toUpperCase().endsWith('.BAS')) {
+      throw ArgumentError.value(
+        filename,
+        'filename',
+        'Program filenames must end with .BAS',
+      );
+    }
+  }
+
+  void _validateDataFilename(String filename) {
+    if (filename.isEmpty) {
+      throw ArgumentError.value(filename, 'filename', 'Must not be empty');
+    }
   }
 
   String _withUnit(num value, TscUnit unit) {

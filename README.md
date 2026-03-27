@@ -10,8 +10,11 @@ This package is shaped after `flutter_esc_pos_utils`, but targets TSC label prin
 - Drawing commands like `TEXT`, `BARCODE`, `QRCODE`, `BAR`, and `BOX`
 - Richer label commands like `BLOCK`, `PDF417`, `DMATRIX`, `REVERSE`, `ERASE`, and `PUTBMP`
 - Printer control commands like `SET PEEL`, `SET TEAR`, `SET CUTTER`, `SET PARTIAL_CUTTER`, `SET REWIND`, and `SET RIBBON`
+- File and device commands like `DOWNLOAD`, `FILES`, `KILL`, `MOVE`, `FORMFEED`, `SELFTEST`, and immediate status/query bytes
 - Bitmap rasterization for the `BITMAP` command
 - Flutter-rendered `khmerText()` support for Khmer and other Unicode text that printer fonts do not handle well
+- Layout helpers for sections, rows, anchors, and padding
+- Image/logo fitting helpers for scaling and centering into label regions
 - Input validation for common parameter ranges
 - Chainable API plus raw command and raw byte hooks for unsupported TSPL features
 
@@ -96,6 +99,33 @@ Run it with:
 cd example
 flutter pub get
 flutter run
+```
+
+## Layout And Image Helpers
+
+You can define label regions without hard-coding every coordinate:
+
+```dart
+final layout = TscLabelLayout(
+  width: 600,
+  height: 400,
+  padding: const TscPadding.all(20),
+);
+
+final rows = layout.rows([60, 120, 140], spacing: 12);
+final logoBox = layout.section(340, 20, 220, 220);
+final centered = logoBox.anchor(120, 80, anchor: TscAnchor.center);
+```
+
+For logos or product images, fit them automatically into a target region:
+
+```dart
+generator.bitmapFitted(
+  const TscRect(340, 20, 220, 220),
+  logoImage,
+  fit: TscImageFit.contain,
+  anchor: TscAnchor.center,
+);
 ```
 
 ## Notes

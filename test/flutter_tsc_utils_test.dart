@@ -1,11 +1,14 @@
 import 'dart:convert';
 
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
 import 'package:flutter_tsc_utils/flutter_tsc_utils.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('builds common TSC commands with chainable API', () {
     final generator = TscGenerator()
       ..size(const TscLabelSize(60, 40))
@@ -137,6 +140,27 @@ void main() {
     expect(latin1.decode(bytes.sublist(bytes.length - 2)), '\r\n');
   });
 
+  test('khmerText renders text through bitmap output', () async {
+    final generator = TscGenerator();
+
+    await generator.khmerText(
+      12,
+      18,
+      'សួស្តី',
+      options: const TscRenderedTextOptions(
+        style: TextStyle(fontSize: 20, color: Color(0xFF000000)),
+        pixelRatio: 1,
+      ),
+    );
+
+    final bytes = generator.build();
+    final prefix = _asciiPrefix(bytes, maxLength: 64);
+
+    expect(prefix, startsWith('BITMAP 12,18,'));
+    expect(bytes.length, greaterThan(prefix.length + 2));
+    expect(latin1.decode(bytes.sublist(bytes.length - 2)), '\r\n');
+  });
+
   test('rejects invalid numeric ranges', () {
     expect(() => TscGenerator().density(16), throwsA(isA<RangeError>()));
     expect(
@@ -155,4 +179,20 @@ void main() {
       throwsA(isA<ArgumentError>()),
     );
   });
+}
+
+String _asciiPrefix(List<int> bytes, {required int maxLength}) {
+  final values = <int>[];
+
+  for (final byte in bytes.take(maxLength)) {
+    if (byte == 10 || byte == 13) {
+      break;
+    }
+    if (byte < 32 || byte > 126) {
+      break;
+    }
+    values.add(byte);
+  }
+
+  return latin1.decode(values);
 }

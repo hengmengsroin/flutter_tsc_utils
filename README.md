@@ -11,6 +11,7 @@ This package is shaped after `flutter_esc_pos_utils`, but targets TSC label prin
 - Richer label commands like `BLOCK`, `PDF417`, `DMATRIX`, `REVERSE`, `ERASE`, and `PUTBMP`
 - Printer control commands like `SET PEEL`, `SET TEAR`, `SET CUTTER`, `SET PARTIAL_CUTTER`, `SET REWIND`, and `SET RIBBON`
 - Bitmap rasterization for the `BITMAP` command
+- Flutter-rendered `khmerText()` support for Khmer and other Unicode text that printer fonts do not handle well
 - Input validation for common parameter ranges
 - Chainable API plus raw command and raw byte hooks for unsupported TSPL features
 
@@ -19,7 +20,7 @@ This package is shaped after `flutter_esc_pos_utils`, but targets TSC label prin
 ```dart
 import 'package:flutter_tsc_utils/flutter_tsc_utils.dart';
 
-void main() {
+Future<void> main() async {
   final generator = TscGenerator();
 
   generator
@@ -48,8 +49,42 @@ void main() {
 }
 ```
 
+## Khmer Text
+
+For Khmer, the safest path is rendering text with Flutter and printing it as a bitmap:
+
+```dart
+import 'package:flutter/painting.dart';
+import 'package:flutter_tsc_utils/flutter_tsc_utils.dart';
+
+Future<void> printKhmer() async {
+  final generator = TscGenerator()
+    ..size(const TscLabelSize(60, 40))
+    ..gap(2, 0)
+    ..cls();
+
+  await generator.khmerText(
+    20,
+    20,
+    'សួស្តី​ពិភពលោក',
+    options: const TscRenderedTextOptions(
+      style: TextStyle(
+        fontSize: 24,
+        color: Color(0xFF000000),
+        fontFamily: 'NotoSansKhmer',
+      ),
+      pixelRatio: 2,
+      padding: 4,
+    ),
+  );
+
+  generator.print();
+}
+```
+
 ## Notes
 
 - TSC models vary a bit in supported commands, fonts, and barcode types.
 - Layout commands like `SIZE` and `GAP` accept units, while object placement uses printer dots.
+- `khmerText()` depends on a Khmer-capable Flutter font such as `NotoSansKhmer`.
 - If you need a command that is not wrapped yet, use `rawCommand()` or `rawBytes()`.

@@ -1,12 +1,15 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'dart:typed_data';
 
-import 'package:image/image.dart';
+import 'package:flutter/painting.dart';
+import 'package:image/image.dart' as img;
 
 import 'commands.dart';
 import 'enums.dart';
 import 'label_size.dart';
 import 'options.dart';
+import 'rendered_text_options.dart';
 import 'text_style.dart';
 
 typedef Generator = TscGenerator;
@@ -382,7 +385,7 @@ class TscGenerator {
   TscGenerator bitmap(
     int x,
     int y,
-    Image image, {
+    img.Image image, {
     TscBitmapMode mode = TscBitmapMode.overwrite,
     int threshold = 127,
   }) {
@@ -394,6 +397,22 @@ class TscGenerator {
     _commands.addRawBytes(raster.bytes);
     _commands.addEncodedText(newLine);
     return this;
+  }
+
+  Future<TscGenerator> khmerText(
+    int x,
+    int y,
+    String value, {
+    required TscRenderedTextOptions options,
+  }) async {
+    final rendered = await _renderFlutterText(value, options: options);
+    return bitmap(
+      x,
+      y,
+      rendered,
+      mode: options.mode,
+      threshold: options.threshold,
+    );
   }
 
   TscGenerator print({int copies = 1, int sets = 1}) {
@@ -434,8 +453,65 @@ class TscGenerator {
     return '${formatTscNumber(value)}${unit.suffix}';
   }
 
-  _RasterizedBitmap _rasterize(Image source, {required int threshold}) {
-    final grayscaleImage = grayscale(Image.from(source));
+  Future<img.Image> _renderFlutterText(
+    String value, {
+    required TscRenderedTextOptions options,
+  }) async {
+    if (value.isEmpty) {
+      throw ArgumentError.value(value, 'value', 'Must not be empty');
+    }
+
+    requirePositive(options.pixelRatio, 'options.pixelRatio');
+    requireNonNegative(options.padding, 'options.padding');
+    requireRange(options.threshold, 0, 255, 'options.threshold');
+
+    final textPainter = TextPainter(
+      text: TextSpan(text: value, style: options.style),
+      textAlign: options.textAlign,
+      textDirection: options.textDirection,
+    );
+
+    textPainter.layout(maxWidth: options.maxWidth ?? double.infinity);
+
+    final contentWidth = textPainter.width.ceil();
+    final contentHeight = textPainter.height.ceil();
+    final padding = options.padding.ceil();
+    final imageWidth = (contentWidth + padding * 2).clamp(1, 65535);
+    final imageHeight = (contentHeight + padding * 2).clamp(1, 65535);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final backgroundPaint = Paint()..color = options.backgroundColor;
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, imageWidth.toDouble(), imageHeight.toDouble()),
+      backgroundPaint,
+    );
+    textPainter.paint(canvas, Offset(options.padding, options.padding));
+
+    final picture = recorder.endRecording();
+    final rendered = await picture.toImage(
+      (imageWidth * options.pixelRatio).ceil(),
+      (imageHeight * options.pixelRatio).ceil(),
+    );
+    final byteData = await rendered.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
+    if (byteData == null) {
+      throw StateError('Failed to convert rendered text to bytes.');
+    }
+
+    final bytes = byteData.buffer.asUint8List();
+    return img.Image.fromBytes(
+      width: rendered.width,
+      height: rendered.height,
+      bytes: bytes.buffer,
+      numChannels: 4,
+      order: img.ChannelOrder.rgba,
+    );
+  }
+
+  _RasterizedBitmap _rasterize(img.Image source, {required int threshold}) {
+    final grayscaleImage = img.grayscale(img.Image.from(source));
     final widthBytes = (grayscaleImage.width + 7) ~/ 8;
     final paddedWidth = widthBytes * 8;
     final bytes = Uint8List(widthBytes * grayscaleImage.height);

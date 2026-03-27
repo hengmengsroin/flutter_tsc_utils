@@ -3,129 +3,225 @@ import 'dart:typed_data';
 
 import 'package:image/image.dart';
 
+import 'commands.dart';
 import 'enums.dart';
 import 'label_size.dart';
+import 'options.dart';
 import 'text_style.dart';
 
 typedef Generator = TscGenerator;
 
 class TscGenerator {
-  TscGenerator({this.newLine = '\r\n', this.codec = latin1});
+  TscGenerator({this.newLine = '\r\n', this.codec = latin1})
+    : _commands = TscCommandBuffer(codec: codec, newLine: newLine);
 
   final String newLine;
   final Encoding codec;
-  final BytesBuilder _buffer = BytesBuilder();
+  final TscCommandBuffer _commands;
 
-  void reset() {
-    _buffer.clear();
+  TscGenerator reset() {
+    _commands.clear();
+    return this;
   }
 
-  Uint8List build() => _buffer.toBytes();
+  Uint8List build() => _commands.build();
 
   List<int> bytes() => build();
 
-  void rawBytes(List<int> bytes) {
-    _buffer.add(bytes);
+  String preview() => String.fromCharCodes(build());
+
+  TscGenerator rawBytes(List<int> bytes) {
+    _commands.addRawBytes(bytes);
+    return this;
   }
 
-  void rawCommand(String command) {
-    _appendCommand(command);
+  TscGenerator rawCommand(String command) {
+    _commands.addCommand(command);
+    return this;
   }
 
-  void size(TscLabelSize size) {
-    _appendCommand(
+  TscGenerator size(TscLabelSize size) {
+    requirePositive(size.width, 'size.width');
+    requirePositive(size.height, 'size.height');
+    return rawCommand(
       'SIZE ${_withUnit(size.width, size.unit)},${_withUnit(size.height, size.unit)}',
     );
   }
 
-  void gap(num gap, num offset, {TscUnit unit = TscUnit.mm}) {
-    _appendCommand('GAP ${_withUnit(gap, unit)},${_withUnit(offset, unit)}');
+  TscGenerator gap(num gap, num offset, {TscUnit unit = TscUnit.mm}) {
+    requireNonNegative(gap, 'gap');
+    requireNonNegative(offset, 'offset');
+    return rawCommand('GAP ${_withUnit(gap, unit)},${_withUnit(offset, unit)}');
   }
 
-  void bline(num height, num offset, {TscUnit unit = TscUnit.mm}) {
-    _appendCommand(
+  TscGenerator bline(num height, num offset, {TscUnit unit = TscUnit.mm}) {
+    requireNonNegative(height, 'height');
+    requireNonNegative(offset, 'offset');
+    return rawCommand(
       'BLINE ${_withUnit(height, unit)},${_withUnit(offset, unit)}',
     );
   }
 
-  void offset(num value, {TscUnit unit = TscUnit.mm}) {
-    _appendCommand('OFFSET ${_withUnit(value, unit)}');
+  TscGenerator offset(num value, {TscUnit unit = TscUnit.mm}) {
+    requireNonNegative(value, 'value');
+    return rawCommand('OFFSET ${_withUnit(value, unit)}');
   }
 
-  void speed(num inchesPerSecond) {
-    _appendCommand('SPEED ${_formatNumber(inchesPerSecond)}');
+  TscGenerator speed(num inchesPerSecond) {
+    requirePositive(inchesPerSecond, 'inchesPerSecond');
+    return rawCommand('SPEED ${formatTscNumber(inchesPerSecond)}');
   }
 
-  void density(int value) {
-    _appendCommand('DENSITY $value');
+  TscGenerator density(int value) {
+    requireRange(value, 0, 15, 'density');
+    return rawCommand('DENSITY $value');
   }
 
-  void direction(
+  TscGenerator direction(
     TscDirection direction, {
     TscMirror mirror = TscMirror.normal,
   }) {
-    _appendCommand('DIRECTION ${direction.value},${mirror.value}');
+    return rawCommand('DIRECTION ${direction.value},${mirror.value}');
   }
 
-  void reference(int x, int y) {
-    _appendCommand('REFERENCE $x,$y');
+  TscGenerator reference(int x, int y) => rawCommand('REFERENCE $x,$y');
+
+  TscGenerator shift(int x) => rawCommand('SHIFT $x');
+
+  TscGenerator codePage(String value) => rawCommand('CODEPAGE $value');
+
+  TscGenerator cls() => rawCommand('CLS');
+
+  TscGenerator feed(int dots) {
+    requireNonNegative(dots, 'dots');
+    return rawCommand('FEED $dots');
   }
 
-  void shift(int x) {
-    _appendCommand('SHIFT $x');
+  TscGenerator backFeed(int dots) {
+    requireNonNegative(dots, 'dots');
+    return rawCommand('BACKFEED $dots');
   }
 
-  void codePage(String value) {
-    _appendCommand('CODEPAGE $value');
+  TscGenerator home() => rawCommand('HOME');
+
+  TscGenerator sound(int level, int interval) {
+    requireRange(level, 0, 9, 'level');
+    requireRange(interval, 1, 4095, 'interval');
+    return rawCommand('SOUND $level,$interval');
   }
 
-  void cls() {
-    _appendCommand('CLS');
+  TscGenerator cut() => rawCommand('CUT');
+
+  TscGenerator setPeel(TscToggle value) =>
+      rawCommand('SET PEEL ${value.value}');
+
+  TscGenerator setTear(TscToggle value) =>
+      rawCommand('SET TEAR ${value.value}');
+
+  TscGenerator setBack(TscToggle value) =>
+      rawCommand('SET BACK ${value.value}');
+
+  TscGenerator setRibbon(TscToggle value) =>
+      rawCommand('SET RIBBON ${value.value}');
+
+  TscGenerator setRewind(TscRewindMode value) =>
+      rawCommand('SET REWIND ${value.value}');
+
+  TscGenerator setCutter({int? every, bool batch = false}) {
+    return _setCutCommand(command: 'SET CUTTER', every: every, batch: batch);
   }
 
-  void feed(int dots) {
-    _appendCommand('FEED $dots');
+  TscGenerator setPartialCutter({int? every, bool batch = false}) {
+    return _setCutCommand(
+      command: 'SET PARTIAL_CUTTER',
+      every: every,
+      batch: batch,
+    );
   }
 
-  void backFeed(int dots) {
-    _appendCommand('BACKFEED $dots');
-  }
-
-  void home() {
-    _appendCommand('HOME');
-  }
-
-  void sound(int level, int interval) {
-    _appendCommand('SOUND $level,$interval');
-  }
-
-  void cut() {
-    _appendCommand('CUT');
-  }
-
-  void text(
+  TscGenerator text(
     int x,
     int y,
     String value, {
     TscTextStyle style = const TscTextStyle(),
   }) {
-    final alignment = style.alignment == null
-        ? ''
-        : ',${style.alignment!.value}';
-    _appendCommand(
-      'TEXT $x,$y,"${style.font.value}",${style.rotation.value},${style.xMultiplier},${style.yMultiplier}$alignment,"${_escapeText(value)}"',
-    );
+    _validateTextStyle(style);
+    final arguments = <String>[
+      '$x',
+      '$y',
+      quoteTsc(style.font.value),
+      '${style.rotation.value}',
+      '${style.xMultiplier}',
+      '${style.yMultiplier}',
+      if (style.alignment != null) '${style.alignment!.value}',
+      quoteTsc(value),
+    ];
+    return rawCommand('TEXT ${arguments.join(',')}');
   }
 
-  void bar(int x, int y, int width, int height) {
-    _appendCommand('BAR $x,$y,$width,$height');
+  TscGenerator block(
+    int x,
+    int y,
+    int width,
+    int height,
+    String value, {
+    TscTextStyle style = const TscTextStyle(),
+    int? space,
+    TscBlockAlignment alignment = TscBlockAlignment.left,
+    bool fit = false,
+  }) {
+    requirePositive(width, 'width');
+    requirePositive(height, 'height');
+    _validateTextStyle(style);
+    if (space != null) {
+      requireNonNegative(space, 'space');
+    }
+
+    final arguments = <String>[
+      '$x',
+      '$y',
+      '$width',
+      '$height',
+      quoteTsc(style.font.value),
+      '${style.rotation.value}',
+      '${style.xMultiplier}',
+      '${style.yMultiplier}',
+    ];
+
+    if (space != null || alignment != TscBlockAlignment.left || fit) {
+      arguments.add('${space ?? 0}');
+      arguments.add(alignment.value);
+      arguments.add(fit ? '1' : '0');
+    }
+
+    arguments.add(quoteTsc(value));
+    return rawCommand('BLOCK ${arguments.join(',')}');
   }
 
-  void box(int x, int y, int xEnd, int yEnd, {int thickness = 1}) {
-    _appendCommand('BOX $x,$y,$xEnd,$yEnd,$thickness');
+  TscGenerator bar(int x, int y, int width, int height) {
+    requirePositive(width, 'width');
+    requirePositive(height, 'height');
+    return rawCommand('BAR $x,$y,$width,$height');
   }
 
-  void barcode(
+  TscGenerator box(int x, int y, int xEnd, int yEnd, {int thickness = 1}) {
+    requirePositive(thickness, 'thickness');
+    return rawCommand('BOX $x,$y,$xEnd,$yEnd,$thickness');
+  }
+
+  TscGenerator erase(int x, int y, int width, int height) {
+    requirePositive(width, 'width');
+    requirePositive(height, 'height');
+    return rawCommand('ERASE $x,$y,$width,$height');
+  }
+
+  TscGenerator reverse(int x, int y, int width, int height) {
+    requirePositive(width, 'width');
+    requirePositive(height, 'height');
+    return rawCommand('REVERSE $x,$y,$width,$height');
+  }
+
+  TscGenerator barcode(
     int x,
     int y,
     String content, {
@@ -137,70 +233,205 @@ class TscGenerator {
     int wide = 2,
     TscTextAlignment? alignment,
   }) {
-    final alignArg = alignment == null ? '' : ',${alignment.value}';
-    _appendCommand(
-      'BARCODE $x,$y,"${type.value}",$height,${readable.value},${rotation.value},$narrow,$wide$alignArg,"${_escapeText(content)}"',
-    );
+    requirePositive(height, 'height');
+    requirePositive(narrow, 'narrow');
+    requirePositive(wide, 'wide');
+
+    final arguments = <String>[
+      '$x',
+      '$y',
+      quoteTsc(type.value),
+      '$height',
+      '${readable.value}',
+      '${rotation.value}',
+      '$narrow',
+      '$wide',
+      if (alignment != null) '${alignment.value}',
+      quoteTsc(content),
+    ];
+    return rawCommand('BARCODE ${arguments.join(',')}');
   }
 
-  void qrCode(
+  TscGenerator qrCode(
     int x,
     int y,
     String content, {
     TscQrErrorCorrection ecc = TscQrErrorCorrection.low,
     TscQrCellWidth cellWidth = TscQrCellWidth.size4,
     TscRotation rotation = TscRotation.angle0,
+    TscTextAlignment? justification,
   }) {
-    _appendCommand(
-      'QRCODE $x,$y,${ecc.value},${cellWidth.value},A,${rotation.value},"${_escapeText(content)}"',
-    );
+    final arguments = <String>[
+      '$x',
+      '$y',
+      ecc.value,
+      '${cellWidth.value}',
+      'A',
+      '${rotation.value}',
+      if (justification != null) 'J${justification.value + 1}',
+      quoteTsc(content),
+    ];
+    return rawCommand('QRCODE ${arguments.join(',')}');
   }
 
-  void bitmap(
+  TscGenerator pdf417(
+    int x,
+    int y,
+    int width,
+    int height,
+    String content, {
+    TscRotation rotation = TscRotation.angle0,
+    TscPdf417Options options = const TscPdf417Options(),
+  }) {
+    requirePositive(width, 'width');
+    requirePositive(height, 'height');
+    if (options.errorCorrectionLevel != null) {
+      requireRange(
+        options.errorCorrectionLevel!,
+        0,
+        8,
+        'options.errorCorrectionLevel',
+      );
+    }
+    if (options.moduleWidth != null) {
+      requireRange(options.moduleWidth!, 2, 9, 'options.moduleWidth');
+    }
+    if (options.barHeight != null) {
+      requireRange(options.barHeight!, 4, 99, 'options.barHeight');
+    }
+    if (options.maxRows != null) {
+      requirePositive(options.maxRows!, 'options.maxRows');
+    }
+    if (options.maxColumns != null) {
+      requirePositive(options.maxColumns!, 'options.maxColumns');
+    }
+
+    final arguments = <String>[
+      '$x',
+      '$y',
+      '$width',
+      '$height',
+      '${rotation.value}',
+    ];
+
+    final optionTokens = <String>[
+      'P${options.compression.value}',
+      if (options.errorCorrectionLevel != null)
+        'E${options.errorCorrectionLevel}',
+      if (options.centerPattern) 'M1',
+      if (options.moduleWidth != null) 'W${options.moduleWidth}',
+      if (options.barHeight != null) 'H${options.barHeight}',
+      if (options.maxRows != null) 'R${options.maxRows}',
+      if (options.maxColumns != null) 'C${options.maxColumns}',
+      if (options.truncated) 'T1',
+    ];
+
+    arguments.addAll(optionTokens);
+    arguments.add(quoteTsc(content));
+    return rawCommand('PDF417 ${arguments.join(',')}');
+  }
+
+  TscGenerator dataMatrix(
+    int x,
+    int y,
+    int width,
+    int height,
+    String content, {
+    TscDataMatrixOptions options = const TscDataMatrixOptions(),
+  }) {
+    requirePositive(width, 'width');
+    requirePositive(height, 'height');
+    if (options.controlCharacter != null) {
+      requireRange(
+        options.controlCharacter!,
+        0,
+        255,
+        'options.controlCharacter',
+      );
+    }
+    if (options.moduleSize != null) {
+      requirePositive(options.moduleSize!, 'options.moduleSize');
+    }
+    if (options.rows != null) {
+      requirePositive(options.rows!, 'options.rows');
+    }
+    if (options.columns != null) {
+      requirePositive(options.columns!, 'options.columns');
+    }
+
+    final arguments = <String>['$x', '$y', '$width', '$height'];
+
+    final optionTokens = <String>[
+      if (options.controlCharacter != null) 'C${options.controlCharacter}',
+      if (options.moduleSize != null) 'X${options.moduleSize}',
+      'R${options.rotation.value}',
+      'A${options.shape.value}',
+      if (options.rows != null) '${options.rows}',
+      if (options.columns != null) '${options.columns}',
+    ];
+
+    arguments.addAll(optionTokens);
+    arguments.add(quoteTsc(content));
+    return rawCommand('DMATRIX ${arguments.join(',')}');
+  }
+
+  TscGenerator putBmp(int x, int y, String filename) {
+    return rawCommand('PUTBMP $x,$y,${quoteTsc(filename)}');
+  }
+
+  TscGenerator bitmap(
     int x,
     int y,
     Image image, {
     TscBitmapMode mode = TscBitmapMode.overwrite,
     int threshold = 127,
   }) {
+    requireRange(threshold, 0, 255, 'threshold');
     final raster = _rasterize(image, threshold: threshold);
-    _buffer.add(
-      codec.encode(
-        'BITMAP $x,$y,${raster.widthBytes},${raster.height},${mode.value},',
-      ),
+    _commands.addEncodedText(
+      'BITMAP $x,$y,${raster.widthBytes},${raster.height},${mode.value},',
     );
-    _buffer.add(raster.bytes);
-    _buffer.add(codec.encode(newLine));
+    _commands.addRawBytes(raster.bytes);
+    _commands.addEncodedText(newLine);
+    return this;
   }
 
-  void print({int copies = 1, int sets = 1}) {
-    _appendCommand('PRINT $sets,$copies');
+  TscGenerator print({int copies = 1, int sets = 1}) {
+    requirePositive(copies, 'copies');
+    requirePositive(sets, 'sets');
+    return rawCommand('PRINT $sets,$copies');
   }
 
-  String preview() => String.fromCharCodes(build());
+  TscGenerator _setCutCommand({
+    required String command,
+    required int? every,
+    required bool batch,
+  }) {
+    if (every != null && batch) {
+      throw ArgumentError(
+        'Choose either batch mode or every=<n> for $command, not both.',
+      );
+    }
 
-  void _appendCommand(String command) {
-    _buffer.add(codec.encode(command));
-    _buffer.add(codec.encode(newLine));
+    if (every != null) {
+      requireRange(every, 0, 65535, 'every');
+      return rawCommand('$command $every');
+    }
+
+    if (batch) {
+      return rawCommand('$command BATCH');
+    }
+
+    return rawCommand('$command OFF');
+  }
+
+  void _validateTextStyle(TscTextStyle style) {
+    requireRange(style.xMultiplier, 1, 10, 'style.xMultiplier');
+    requireRange(style.yMultiplier, 1, 10, 'style.yMultiplier');
   }
 
   String _withUnit(num value, TscUnit unit) {
-    return '${_formatNumber(value)}${unit.suffix}';
-  }
-
-  String _formatNumber(num value) {
-    if (value is int) {
-      return value.toString();
-    }
-
-    final normalized = value.toStringAsFixed(3);
-    return normalized.contains('.')
-        ? normalized.replaceFirst(RegExp(r'\.?0+$'), '')
-        : normalized;
-  }
-
-  String _escapeText(String value) {
-    return value.replaceAll('"', r'\"');
+    return '${formatTscNumber(value)}${unit.suffix}';
   }
 
   _RasterizedBitmap _rasterize(Image source, {required int threshold}) {

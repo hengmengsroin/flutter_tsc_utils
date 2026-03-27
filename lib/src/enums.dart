@@ -8,6 +8,15 @@ enum TscUnit {
   final String suffix;
 }
 
+enum TscToggle {
+  on('ON'),
+  off('OFF');
+
+  const TscToggle(this.value);
+
+  final String value;
+}
+
 enum TscDirection {
   forward(0),
   backward(1);
@@ -45,6 +54,17 @@ enum TscTextAlignment {
   const TscTextAlignment(this.value);
 
   final int value;
+}
+
+enum TscBlockAlignment {
+  left('LEFT'),
+  center('CENTER'),
+  right('RIGHT'),
+  justified('JUSTIFIED');
+
+  const TscBlockAlignment(this.value);
+
+  final String value;
 }
 
 enum TscFont {
@@ -122,6 +142,16 @@ enum TscBitmapMode {
   final int value;
 }
 
+enum TscRewindMode {
+  on('ON'),
+  off('OFF'),
+  rs232('RS232');
+
+  const TscRewindMode(this.value);
+
+  final String value;
+}
+
 enum TscQrErrorCorrection {
   low('L'),
   medium('M'),
@@ -146,6 +176,24 @@ enum TscQrCellWidth {
   size10(10);
 
   const TscQrCellWidth(this.value);
+
+  final int value;
+}
+
+enum TscPdf417CompressionMode {
+  auto(0),
+  binary(1);
+
+  const TscPdf417CompressionMode(this.value);
+
+  final int value;
+}
+
+enum TscDataMatrixShape {
+  square(0),
+  rectangular(1);
+
+  const TscDataMatrixShape(this.value);
 
   final int value;
 }

@@ -142,6 +142,29 @@ enum TscBarcodeType {
   final String value;
 }
 
+enum TscPrintDensity {
+  d0(0),
+  d1(1),
+  d2(2),
+  d3(3),
+  d4(4),
+  d5(5),
+  d6(6),
+  d7(7),
+  d8(8),
+  d9(9),
+  d10(10),
+  d11(11),
+  d12(12),
+  d13(13),
+  d14(14),
+  d15(15);
+
+  const TscPrintDensity(this.value);
+
+  final int value;
+}
+
 enum TscBitmapMode {
   overwrite(0),
   or(1),

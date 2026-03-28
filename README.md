@@ -52,6 +52,186 @@ Future<void> main() async {
 }
 ```
 
+## Declarative Generator
+
+If you prefer a `config + commands + await build()` flow, use `TscLabelGenerator`:
+
+```dart
+import 'package:flutter_tsc_utils/flutter_tsc_utils.dart';
+
+final generator = TscLabelGenerator(
+  config: const TscLabelConfiguration(
+    printWidth: 406, // 2 inches at 203 DPI
+    labelLength: 203, // 1 inch at 203 DPI
+    printDensity: TscPrintDensity.d8,
+  ),
+  commands: const [
+    TscText(x: 20, y: 20, text: 'Hello World!'),
+    TscBarcode(
+      x: 20,
+      y: 60,
+      height: 50,
+      data: '12345',
+      type: TscBarcodeType.code128,
+      printInterpretationLine: true,
+    ),
+  ],
+);
+
+final tspl = await generator.build();
+final bytes = await generator.buildBytes();
+```
+
+## Live Preview Widget
+
+For a fast local preview in Flutter, wrap the same declarative generator in `TscPreview`:
+
+```dart
+class LabelPreviewScreen extends StatelessWidget {
+  LabelPreviewScreen({super.key});
+
+  final generator = TscLabelGenerator(
+    config: const TscLabelConfiguration(
+      printWidth: 406,
+      labelLength: 203,
+    ),
+    commands: const [
+      TscText(x: 20, y: 20, text: 'Hello World!'),
+      TscBarcode(x: 20, y: 60, data: '12345'),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: TscPreview(generator: generator),
+      ),
+    );
+  }
+}
+```
+
+`TscPreview` rebuilds from the same `TscLabelGenerator`, renders an approximate local label view for common commands, and also shows the generated TSPL command text below it.
+
+## Rich Layout API
+
+For receipt-style labels, you can compose higher-level layout commands:
+
+```dart
+final generator = TscLabelGenerator(
+  config: const TscLabelConfiguration(
+    printWidth: 576,
+    labelLength: 1200,
+    printDensity: TscPrintDensity.d8,
+  ),
+  commands: const [
+    TscText(x: 0, y: 30, text: 'RECEIPT', fontHeight: 50, fontWidth: 45),
+    TscText(x: 0, y: 100, text: 'Receipt number: 117 - 44332'),
+    TscText(x: 0, y: 130, text: 'Date of purchase: December 8, 2023'),
+    TscGridRow(
+      y: 200,
+      children: [
+        TscGridCol(
+          width: 6,
+          child: TscColumn(
+            children: [
+              TscText(text: 'Big Machinery, LLC', fontHeight: 25, fontWidth: 22),
+              TscText(
+                text: '3345, Diamond St, Orange City, ST 9987',
+                fontHeight: 18,
+                fontWidth: 16,
+              ),
+            ],
+          ),
+        ),
+        TscGridCol(
+          width: 6,
+          child: TscColumn(
+            children: [
+              TscText(text: 'Bill To', fontHeight: 25, fontWidth: 22),
+              TscText(text: 'Doe John', fontHeight: 18, fontWidth: 16),
+            ],
+          ),
+        ),
+      ],
+    ),
+    TscTable(
+      y: 360,
+      columnWidths: [6, 2, 2, 2],
+      borderThickness: 2,
+      cellPadding: 6,
+      headers: [
+        TscTableHeader('Item'),
+        TscTableHeader('Qty', alignment: TscAlignment.center),
+        TscTableHeader('Unit', alignment: TscAlignment.center),
+        TscTableHeader('Total', alignment: TscAlignment.center),
+      ],
+      data: [
+        ['Fuel Plastic Jug (10 gal)', '01', '\$34.00', '\$34.00'],
+        ['Gas Hose (5 feet)', '01', '\$15.00', '\$15.00'],
+        ['Aluminum Screw (4 in)', '100', '\$0.87', '\$87.00'],
+      ],
+      dataFontHeight: 18,
+      dataFontWidth: 16,
+    ),
+    TscSeparator(y: 685, thickness: 2, paddingLeft: 50, paddingRight: 50),
+    TscText(x: 50, y: 710, text: 'Total: \$152.32', fontHeight: 26, fontWidth: 24),
+    TscText(
+      y: 785,
+      text: 'Scan for digital receipt:',
+      alignment: TscAlignment.center,
+    ),
+    TscQrCode(
+      y: 815,
+      data: 'https://receipt.example.com/117-44332',
+      alignment: TscAlignment.center,
+    ),
+  ],
+);
+
+final tspl = await generator.build();
+```
+
+You can also use the higher-level receipt helpers when you want a cleaner totals or address section API:
+
+```dart
+final generator = TscLabelGenerator(
+  config: const TscLabelConfiguration(
+    printWidth: 400,
+    labelLength: 700,
+  ),
+  commands: const [
+    TscReceiptSection(
+      y: 40,
+      title: 'Bill To',
+      lines: ['Doe John', '3345 Diamond St'],
+    ),
+    TscReceiptTotals(
+      y: 300,
+      x: 40,
+      width: 320,
+      lines: [
+        TscReceiptTotalLine(label: 'Subtotal', value: '\$136.00'),
+        TscReceiptTotalLine(label: 'Tax (12%)', value: '\$16.32'),
+        TscReceiptTotalLine(
+          label: 'Total',
+          value: '\$152.32',
+          fontHeight: 24,
+          fontWidth: 22,
+          emphasis: true,
+        ),
+      ],
+    ),
+  ],
+);
+```
+
+## Preview Service Note
+
+`Labelary` is a ZPL renderer, so it cannot render this package's TSC `TSPL/TSPL2` output directly. This package therefore provides a local `TscPreview` widget instead of a misleading `LabelaryService` wrapper for TSPL.
+
 ## Khmer Text
 
 For Khmer, the safest path is rendering text with Flutter and printing it as a bitmap:
@@ -89,9 +269,9 @@ Future<void> printKhmer() async {
 
 A Flutter example app is included in [example/lib/main.dart](/Users/hengmengsroin/Documents/projects/flutter-plugins/flutter_tsc_utils/example/lib/main.dart). It provides:
 
-- A live label preview
-- A TSPL command preview
-- A Khmer text demo using `khmerText()`
+- A declarative `TscLabelGenerator` demo
+- A live `TscPreview` widget
+- Receipt-style layout composition with text, barcode, QR, and rendered Khmer text
 
 Run it with:
 

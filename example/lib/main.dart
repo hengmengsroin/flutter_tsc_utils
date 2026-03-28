@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_tsc_utils/flutter_tsc_utils.dart';
 
@@ -41,7 +39,10 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
     text: 'សួស្តី​ពិភពលោក',
   );
 
-  String _preview = '';
+  TscLabelGenerator _generator = _buildGenerator(
+    englishText: 'Hello TSC',
+    khmerText: 'សួស្តី​ពិភពលោក',
+  );
   int _byteLength = 0;
 
   @override
@@ -58,53 +59,74 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
   }
 
   Future<void> _rebuildPreview() async {
-    final generator = TscGenerator()
-      ..size(const TscLabelSize(60, 40))
-      ..gap(2, 0)
-      ..density(8)
-      ..direction(TscDirection.forward)
-      ..cls()
-      ..text(24, 24, _englishController.text)
-      ..barcode(24, 80, '123456789012', height: 70)
-      ..qrCode(360, 24, 'https://pub.dev/packages/flutter_tsc_utils');
-
-    await generator.khmerText(
-      24,
-      190,
-      _khmerController.text,
-      options: const TscRenderedTextOptions(
-        style: TextStyle(
-          fontSize: 28,
-          color: Color(0xFF000000),
-          fontFamilyFallback: <String>[
-            'Noto Sans Khmer',
-            'NotoSansKhmer',
-            'Khmer OS',
-          ],
-        ),
-        pixelRatio: 2,
-        padding: 4,
-      ),
+    final generator = _buildGenerator(
+      englishText: _englishController.text,
+      khmerText: _khmerController.text,
     );
 
-    generator
-      ..block(
-        24,
-        280,
-        300,
-        90,
-        'Khmer text is rendered by Flutter and sent as a bitmap.',
-      )
-      ..print();
+    final bytes = await generator.buildBytes();
 
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _preview = generator.preview();
-      _byteLength = generator.bytes().length;
+      _generator = generator;
+      _byteLength = bytes.length;
     });
+  }
+
+  static TscLabelGenerator _buildGenerator({
+    required String englishText,
+    required String khmerText,
+  }) {
+    return TscLabelGenerator(
+      config: const TscLabelConfiguration(
+        printWidth: 600,
+        labelLength: 400,
+        printDensity: TscPrintDensity.d8,
+      ),
+      commands: [
+        TscText(x: 24, y: 24, text: englishText),
+        const TscBarcode(
+          x: 24,
+          y: 80,
+          data: '123456789012',
+          height: 70,
+          type: TscBarcodeType.code128,
+          printInterpretationLine: true,
+        ),
+        const TscQrCode(
+          x: 420,
+          y: 24,
+          data: 'https://pub.dev/packages/flutter_tsc_utils',
+          cellWidth: TscQrCellWidth.size4,
+        ),
+        TscRenderedText(
+          x: 24,
+          y: 190,
+          text: khmerText,
+          options: const TscRenderedTextOptions(
+            style: TextStyle(
+              fontSize: 28,
+              color: Color(0xFF000000),
+              fontFamilyFallback: <String>[
+                'Noto Sans Khmer',
+                'NotoSansKhmer',
+                'Khmer OS',
+              ],
+            ),
+            pixelRatio: 2,
+            padding: 4,
+          ),
+        ),
+        const TscText(
+          x: 24,
+          y: 330,
+          text: 'Khmer text is rendered by Flutter and sent as a bitmap.',
+        ),
+      ],
+    );
   }
 
   @override
@@ -122,11 +144,7 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
                 onChanged: _rebuildPreview,
                 byteLength: _byteLength,
               ),
-              _LabelPreview(
-                englishText: _englishController.text,
-                khmerText: _khmerController.text,
-                commandPreview: _preview,
-              ),
+              _LabelPreview(generator: _generator),
             ];
 
             return wide
@@ -169,10 +187,13 @@ class _ControlsPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Demo label', style: theme.textTheme.headlineSmall),
+          Text(
+            'Declarative preview demo',
+            style: theme.textTheme.headlineSmall,
+          ),
           const SizedBox(height: 8),
           Text(
-            'This preview app shows how to generate TSPL commands and render Khmer text as a bitmap using Flutter.',
+            'Update the generator inputs and the preview widget rebuilds from the same TSC label definition.',
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),
@@ -201,7 +222,7 @@ class _ControlsPanel extends StatelessWidget {
           FilledButton.icon(
             onPressed: onChanged,
             icon: const Icon(Icons.refresh),
-            label: const Text('Rebuild command preview'),
+            label: const Text('Rebuild live preview'),
           ),
           const SizedBox(height: 20),
           Container(
@@ -225,15 +246,9 @@ class _ControlsPanel extends StatelessWidget {
 }
 
 class _LabelPreview extends StatelessWidget {
-  const _LabelPreview({
-    required this.englishText,
-    required this.khmerText,
-    required this.commandPreview,
-  });
+  const _LabelPreview({required this.generator});
 
-  final String englishText;
-  final String khmerText;
-  final String commandPreview;
+  final TscLabelGenerator generator;
 
   @override
   Widget build(BuildContext context) {
@@ -244,137 +259,14 @@ class _LabelPreview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 600,
-            constraints: const BoxConstraints(maxWidth: 600),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFFFCF1), Color(0xFFF7F1DE)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x22000000),
-                  blurRadius: 20,
-                  offset: Offset(0, 8),
-                ),
-              ],
-            ),
-            child: AspectRatio(
-              aspectRatio: 60 / 40,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 8,
-                    top: 0,
-                    child: Text(
-                      englishText,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 8,
-                    top: 58,
-                    child: Container(
-                      width: 220,
-                      height: 70,
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          top: BorderSide(width: 2),
-                          bottom: BorderSide(width: 2),
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '|||| ||| | |||| |||',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: Colors.black,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      color: Colors.black12,
-                      alignment: Alignment.center,
-                      child: const Text('QR'),
-                    ),
-                  ),
-                  Positioned(
-                    left: 8,
-                    right: 8,
-                    top: 150,
-                    child: Text(
-                      khmerText,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: Colors.black,
-                        fontFamilyFallback: const <String>[
-                          'Noto Sans Khmer',
-                          'NotoSansKhmer',
-                          'Khmer OS',
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 8,
-                    right: 8,
-                    bottom: 8,
-                    child: Text(
-                      'Khmer text is rendered as bitmap before sending to the printer.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text('TSPL preview', style: theme.textTheme.titleLarge),
+          Text('Live preview', style: theme.textTheme.titleLarge),
           const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B1320),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: SelectableText(
-              _trimCommandPreview(commandPreview),
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                color: Color(0xFFD9F99D),
-                height: 1.4,
-              ),
-            ),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: TscPreview(generator: generator),
           ),
         ],
       ),
     );
   }
-}
-
-String _trimCommandPreview(String preview) {
-  final lines = const LineSplitter().convert(preview);
-  return lines
-      .map((line) {
-        if (line.startsWith('BITMAP ')) {
-          return '${line.substring(0, line.indexOf(',') + 1)}<binary bitmap bytes>';
-        }
-        return line;
-      })
-      .join('\n');
 }

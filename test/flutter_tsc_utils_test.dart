@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/painting.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
@@ -33,6 +33,311 @@ void main() {
       'QRCODE 20,180,L,4,A,0,"https://example.com"\r\n'
       'PRINT 1,1\r\n',
     );
+  });
+
+  test('builds labels with declarative generator API', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(
+        printWidth: 406,
+        labelLength: 203,
+        printDensity: TscPrintDensity.d8,
+      ),
+      commands: const [
+        TscText(x: 20, y: 20, text: 'Hello World!'),
+        TscBarcode(
+          x: 20,
+          y: 60,
+          height: 50,
+          data: '12345',
+          type: TscBarcodeType.code128,
+          printInterpretationLine: true,
+        ),
+      ],
+    );
+
+    expect(
+      await generator.build(),
+      'SIZE 406 dot,203 dot\r\n'
+      'GAP 0 dot,0 dot\r\n'
+      'DENSITY 8\r\n'
+      'DIRECTION 0,0\r\n'
+      'REFERENCE 0,0\r\n'
+      'CLS\r\n'
+      'TEXT 20,20,"3",0,1,1,"Hello World!"\r\n'
+      'BARCODE 20,60,"128",50,2,0,2,2,"12345"\r\n'
+      'PRINT 1,1\r\n',
+    );
+  });
+
+  test('declarative generator can build printer bytes', () async {
+    final source = img.Image(width: 8, height: 1);
+    img.fill(source, color: img.ColorRgb8(255, 255, 255));
+    source.setPixelRgb(0, 0, 0, 0, 0);
+
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 100, labelLength: 50),
+      commands: [TscBitmap(x: 10, y: 12, image: source)],
+    );
+
+    expect(
+      _asciiPrefix(await generator.buildBytes(), maxLength: 96),
+      startsWith('SIZE 100 dot,50 dot'),
+    );
+  });
+
+  test('supports rich declarative receipt layout commands', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(
+        printWidth: 576,
+        labelLength: 1200,
+        printDensity: TscPrintDensity.d8,
+      ),
+      commands: const [
+        TscText(x: 0, y: 30, text: 'RECEIPT', fontHeight: 50, fontWidth: 45),
+        TscText(
+          x: 0,
+          y: 100,
+          text: 'Receipt number: 117 - 44332',
+          fontHeight: 24,
+          fontWidth: 22,
+        ),
+        TscGridRow(
+          y: 200,
+          children: [
+            TscGridCol(
+              width: 6,
+              child: TscColumn(
+                children: [
+                  TscText(
+                    text: 'Big Machinery, LLC',
+                    fontHeight: 25,
+                    fontWidth: 22,
+                  ),
+                  TscText(
+                    text: '3345 Diamond St',
+                    fontHeight: 18,
+                    fontWidth: 16,
+                  ),
+                ],
+              ),
+            ),
+            TscGridCol(
+              width: 6,
+              child: TscColumn(
+                children: [
+                  TscText(text: 'Bill To', fontHeight: 25, fontWidth: 22),
+                  TscText(text: 'Doe John', fontHeight: 18, fontWidth: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+        TscTable(
+          y: 360,
+          columnWidths: [6, 2, 2, 2],
+          borderThickness: 2,
+          cellPadding: 6,
+          headers: [
+            TscTableHeader('Item', fontHeight: 22, fontWidth: 20),
+            TscTableHeader(
+              'Qty',
+              alignment: TscAlignment.center,
+              fontHeight: 22,
+              fontWidth: 20,
+            ),
+            TscTableHeader(
+              'Unit',
+              alignment: TscAlignment.center,
+              fontHeight: 22,
+              fontWidth: 20,
+            ),
+            TscTableHeader(
+              'Total',
+              alignment: TscAlignment.center,
+              fontHeight: 22,
+              fontWidth: 20,
+            ),
+          ],
+          data: [
+            ['Fuel Plastic Jug (10 gal)', '01', '\$34.00', '\$34.00'],
+            ['Gas Hose (5 feet)', '01', '\$15.00', '\$15.00'],
+          ],
+          dataFontHeight: 18,
+          dataFontWidth: 16,
+        ),
+        TscSeparator(y: 685, thickness: 2, paddingLeft: 50, paddingRight: 50),
+        TscText(
+          x: 50,
+          y: 710,
+          text: 'Total: \$152.32',
+          fontHeight: 26,
+          fontWidth: 24,
+        ),
+        TscText(
+          y: 785,
+          text: 'Scan for digital receipt:',
+          alignment: TscAlignment.center,
+        ),
+        TscQrCode(
+          y: 815,
+          data: 'https://receipt.example.com/117-44332',
+          alignment: TscAlignment.center,
+        ),
+      ],
+    );
+
+    final output = await generator.build();
+
+    expect(output, contains('TEXT 0,30,"3",0,2,2,"RECEIPT"'));
+    expect(
+      output,
+      contains('TEXT 0,100,"3",0,1,1,"Receipt number: 117 - 44332"'),
+    );
+    expect(output, contains('TEXT 0,200,"3",0,1,1,"Big Machinery, LLC"'));
+    expect(output, contains('TEXT 294,200,"3",0,1,1,"Bill To"'));
+    expect(output, contains('BOX 0,360,288,398,2'));
+    expect(output, contains('BAR 50,685,476,2'));
+    expect(output, contains('QRCODE'));
+    expect(output, endsWith('PRINT 1,1\r\n'));
+  });
+
+  test('wraps long table cells and auto-expands row height', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 300, labelLength: 500),
+      commands: const [
+        TscTable(
+          y: 40,
+          columnWidths: [8, 4],
+          headers: [
+            TscTableHeader('Description'),
+            TscTableHeader('Price', alignment: TscAlignment.right),
+          ],
+          data: [
+            ['Very long product name that should wrap across lines', '\$99.00'],
+          ],
+          dataFontHeight: 18,
+          dataFontWidth: 16,
+        ),
+      ],
+    );
+
+    final output = await generator.build();
+
+    expect(output, contains('BOX 0,75,200,143,1'));
+    expect(output, contains('TEXT 6,81,"3",0,1,1,"Very long product"'));
+    expect(output, contains('TEXT 6,99,"3",0,1,1,"name that should"'));
+    expect(output, contains('TEXT 6,117,"3",0,1,1,"wrap across lines"'));
+  });
+
+  test('supports receipt section and totals helpers', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 400, labelLength: 700),
+      commands: const [
+        TscReceiptSection(
+          y: 40,
+          title: 'Bill To',
+          lines: ['Doe John', '3345 Diamond St'],
+        ),
+        TscReceiptTotals(
+          y: 300,
+          x: 40,
+          width: 320,
+          lines: [
+            TscReceiptTotalLine(label: 'Subtotal', value: '\$136.00'),
+            TscReceiptTotalLine(label: 'Tax (12%)', value: '\$16.32'),
+            TscReceiptTotalLine(
+              label: 'Total',
+              value: '\$152.32',
+              fontHeight: 24,
+              fontWidth: 22,
+              emphasis: true,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final output = await generator.build();
+
+    expect(output, contains('TEXT 0,40,"3",0,1,1,"Bill To"'));
+    expect(output, contains('TEXT 0,82,"3",0,1,1,"Doe John"'));
+    expect(output, contains('TEXT 40,300,"3",0,1,1,"Subtotal"'));
+    expect(output, contains('TEXT 282,300,"3",0,1,1,2,"\$136.00"'));
+    expect(output, contains('BAR 40,360,320,2'));
+    expect(output, contains('TEXT 40,372,"3",0,1,1,"Total"'));
+  });
+
+  testWidgets('TscPreview renders generator content and command preview', (
+    tester,
+  ) async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 406, labelLength: 203),
+      commands: const [
+        TscText(x: 20, y: 20, text: 'Hello Preview'),
+        TscBarcode(x: 20, y: 60, data: '12345'),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(width: 500, child: TscPreview(generator: generator)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hello Preview'), findsOneWidget);
+    expect(find.textContaining('TEXT 20,20'), findsOneWidget);
+    expect(find.byType(SelectableText), findsOneWidget);
+  });
+
+  testWidgets('TscPreview renders rich table and totals content', (
+    tester,
+  ) async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 400, labelLength: 700),
+      commands: const [
+        TscTable(
+          y: 40,
+          columnWidths: [8, 4],
+          headers: [
+            TscTableHeader('Description'),
+            TscTableHeader('Price', alignment: TscAlignment.right),
+          ],
+          data: [
+            ['Very long product name that should wrap across lines', '\$99.00'],
+          ],
+        ),
+        TscReceiptTotals(
+          y: 300,
+          x: 40,
+          width: 320,
+          lines: [
+            TscReceiptTotalLine(label: 'Subtotal', value: '\$136.00'),
+            TscReceiptTotalLine(
+              label: 'Total',
+              value: '\$152.32',
+              emphasis: true,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(width: 500, child: TscPreview(generator: generator)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Description'), findsOneWidget);
+    expect(find.text('Subtotal'), findsOneWidget);
+    expect(find.text('Total'), findsOneWidget);
+    expect(find.textContaining('BAR 40,'), findsOneWidget);
   });
 
   test('supports richer label and setup commands', () {

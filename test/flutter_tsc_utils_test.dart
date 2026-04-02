@@ -340,6 +340,29 @@ void main() {
     expect(find.textContaining('BAR 40,'), findsOneWidget);
   });
 
+  testWidgets('TscPreview stays readable on narrow layouts', (tester) async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 600, labelLength: 220),
+      commands: const [
+        TscText(x: 20, y: 20, text: 'Narrow layout'),
+        TscBarcode(x: 20, y: 70, data: '123456789012', height: 60),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(width: 220, child: TscPreview(generator: generator)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Narrow layout'), findsOneWidget);
+    expect(find.textContaining('TEXT 20,20'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('supports richer label and setup commands', () {
     final generator = TscGenerator()
       ..setPeel(TscToggle.on)

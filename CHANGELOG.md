@@ -1,3 +1,9 @@
+## 0.2.1
+
+- Improved `TscPreview` rendering on narrow layouts by keeping the label preview readable and allowing horizontal inspection for wider labels.
+- Improved `TscPreview` text measurement and table wrapping so aligned text and wrapped content more closely match the Flutter-rendered preview.
+- Added regression coverage for narrow preview layouts.
+
 ## 0.2.0
 
 - Added a declarative `TscLabelGenerator` API with async `build()` and `buildBytes()` helpers.

@@ -51,66 +51,81 @@ class _TscPreviewState extends State<TscPreview> {
   Widget build(BuildContext context) {
     final config = widget.generator.config;
 
-    return FutureBuilder<String>(
-      future: _commandFuture,
-      builder: (context, snapshot) {
-        final aspectRatio = config.printWidth / config.labelLength;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : config.printWidth.toDouble();
+        final metrics = _resolvePreviewMetrics(
+          availableWidth: availableWidth,
+          printWidth: config.printWidth.toDouble(),
+          labelLength: config.labelLength.toDouble(),
+        );
+        final compact = availableWidth < 420;
 
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: widget.padding,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF4F0E6),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: AspectRatio(
-                  aspectRatio: aspectRatio.isFinite && aspectRatio > 0
-                      ? aspectRatio
-                      : 1,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return _PreviewCanvas(
-                        generator: widget.generator,
-                        width: constraints.maxWidth,
-                        height: constraints.maxHeight,
-                        backgroundColor: widget.backgroundColor,
-                        borderColor: widget.borderColor,
-                        showDebugOverlay: widget.showDebugOverlay,
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0B1320),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: snapshot.connectionState == ConnectionState.waiting
-                      ? const SizedBox(
-                          height: 72,
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      : SelectableText(
-                          snapshot.hasError
-                              ? 'Preview build failed: ${snapshot.error}'
-                              : _trimCommandPreview(snapshot.data ?? ''),
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            color: Color(0xFFD9F99D),
-                            height: 1.4,
-                          ),
+        return FutureBuilder<String>(
+          future: _commandFuture,
+          builder: (context, snapshot) {
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: compact
+                        ? const EdgeInsets.all(12)
+                        : widget.padding,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4F0E6),
+                      borderRadius: BorderRadius.circular(compact ? 18 : 24),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: metrics.width,
+                        height: metrics.height,
+                        child: _PreviewCanvas(
+                          generator: widget.generator,
+                          width: metrics.width,
+                          height: metrics.height,
+                          backgroundColor: widget.backgroundColor,
+                          borderColor: widget.borderColor,
+                          showDebugOverlay: widget.showDebugOverlay,
                         ),
-                ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B1320),
+                      borderRadius: BorderRadius.circular(compact ? 14 : 18),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(compact ? 12 : 14),
+                      child: snapshot.connectionState == ConnectionState.waiting
+                          ? const SizedBox(
+                              height: 72,
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          : SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: SelectableText(
+                                snapshot.hasError
+                                    ? 'Preview build failed: ${snapshot.error}'
+                                    : _trimCommandPreview(snapshot.data ?? ''),
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  color: Color(0xFFD9F99D),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -195,8 +210,16 @@ class _PreviewCanvas extends StatelessWidget {
         10.0,
         (command.fontHeight ?? (12.0 * command.style.yMultiplier)).toDouble(),
       );
-      final fontWidth = command.fontWidth ?? (command.style.xMultiplier * 24);
-      final estimatedWidth = _estimateTextWidth(command.text, fontWidth);
+      final textStyle = TextStyle(
+        color: Colors.black,
+        fontSize: fontSize * scaleY,
+        fontWeight: FontWeight.w600,
+      );
+      final estimatedWidth = _measurePreviewTextWidth(
+        command.text,
+        textStyle,
+        scaleY: scaleY,
+      );
       final localX =
           command.x ??
           _resolveAlignedX(
@@ -213,14 +236,7 @@ class _PreviewCanvas extends StatelessWidget {
             child: Transform.rotate(
               angle: command.style.rotation.value * math.pi / 180,
               alignment: Alignment.topLeft,
-              child: Text(
-                command.text,
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: fontSize * scaleY,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: Text(command.text, style: textStyle),
             ),
           ),
         ],
@@ -557,18 +573,20 @@ class _PreviewCanvas extends StatelessWidget {
     var currentY = previewContext.originY + command.y;
     final originX = previewContext.originX + command.x;
 
-    int rowHeight(
-      List<String> cells,
-      List<int> fontHeights,
-      List<int> fontWidths,
-    ) {
+    int rowHeight(List<String> cells, List<int> fontHeights) {
       var maxHeight = 0;
       for (var i = 0; i < columnPixelWidths.length; i++) {
         final value = i < cells.length ? cells[i] : '';
+        final textStyle = TextStyle(
+          color: Colors.black,
+          fontSize: math.max(9, fontHeights[i] * scaleY),
+          fontWeight: FontWeight.w600,
+        );
         final lines = _wrapText(
           value,
           maxWidth: math.max(1, columnPixelWidths[i] - command.cellPadding * 2),
-          fontWidth: fontWidths[i],
+          style: textStyle,
+          scaleY: scaleY,
         );
         maxHeight = math.max(
           maxHeight,
@@ -584,7 +602,6 @@ class _PreviewCanvas extends StatelessWidget {
       List<String> cells,
       List<TscAlignment> alignments,
       List<int> fontHeights,
-      List<int> fontWidths,
       int height,
     ) {
       var cellX = originX;
@@ -608,14 +625,24 @@ class _PreviewCanvas extends StatelessWidget {
         );
 
         final value = i < cells.length ? cells[i] : '';
+        final textStyle = TextStyle(
+          color: Colors.black,
+          fontSize: math.max(9, fontHeights[i] * scaleY),
+          fontWeight: FontWeight.w600,
+        );
         final lines = _wrapText(
           value,
           maxWidth: math.max(1, cellWidth - command.cellPadding * 2),
-          fontWidth: fontWidths[i],
+          style: textStyle,
+          scaleY: scaleY,
         );
         for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
           final line = lines[lineIndex];
-          final textWidth = _estimateTextWidth(line, fontWidths[i]);
+          final textWidth = _measurePreviewTextWidth(
+            line,
+            textStyle,
+            scaleY: scaleY,
+          );
           final contentWidth = math.max(0, cellWidth - command.cellPadding * 2);
           final textX = switch (alignments[i]) {
             TscAlignment.left => cellX + command.cellPadding,
@@ -638,14 +665,7 @@ class _PreviewCanvas extends StatelessWidget {
                       command.cellPadding +
                       lineIndex * fontHeights[i]) *
                   scaleY,
-              child: Text(
-                line,
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: math.max(9, fontHeights[i] * scaleY),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: Text(line, style: textStyle),
             ),
           );
         }
@@ -657,13 +677,11 @@ class _PreviewCanvas extends StatelessWidget {
     final headerHeight = rowHeight(
       command.headers.map((header) => header.text).toList(),
       command.headers.map((header) => header.fontHeight).toList(),
-      command.headers.map((header) => header.fontWidth).toList(),
     );
     drawRow(
       command.headers.map((header) => header.text).toList(),
       command.headers.map((header) => header.alignment).toList(),
       command.headers.map((header) => header.fontHeight).toList(),
-      command.headers.map((header) => header.fontWidth).toList(),
       headerHeight,
     );
     currentY += headerHeight - command.borderThickness;
@@ -672,13 +690,11 @@ class _PreviewCanvas extends StatelessWidget {
       final dataHeight = rowHeight(
         row,
         List.filled(row.length, command.dataFontHeight),
-        List.filled(row.length, command.dataFontWidth),
       );
       drawRow(
         row,
         List.filled(row.length, TscAlignment.left),
         List.filled(row.length, command.dataFontHeight),
-        List.filled(row.length, command.dataFontWidth),
         dataHeight,
       );
       currentY += dataHeight - command.borderThickness;
@@ -746,8 +762,31 @@ class _PreviewBuildResult {
   final int height;
 }
 
-int _estimateTextWidth(String text, int fontWidth) {
-  return math.max(1, (text.length * fontWidth * 0.62).round());
+class _PreviewMetrics {
+  const _PreviewMetrics({required this.width, required this.height});
+
+  final double width;
+  final double height;
+}
+
+_PreviewMetrics _resolvePreviewMetrics({
+  required double availableWidth,
+  required double printWidth,
+  required double labelLength,
+}) {
+  final safeWidth = availableWidth.isFinite && availableWidth > 0
+      ? availableWidth
+      : printWidth;
+  final safeAspectRatio = labelLength > 0 && printWidth > 0
+      ? printWidth / labelLength
+      : 1.0;
+  final minHeight = math.min(math.max(180.0, safeWidth * 0.45), 260.0);
+  final targetHeight = (safeWidth / safeAspectRatio).clamp(minHeight, 520.0);
+
+  return _PreviewMetrics(
+    width: targetHeight * safeAspectRatio,
+    height: targetHeight,
+  );
 }
 
 int _resolveAlignedX(int width, int itemWidth, TscAlignment? alignment) {
@@ -761,51 +800,65 @@ int _resolveAlignedX(int width, int itemWidth, TscAlignment? alignment) {
 List<String> _wrapText(
   String text, {
   required int maxWidth,
-  required int fontWidth,
+  required TextStyle style,
+  required double scaleY,
 }) {
-  final normalized = text.trim();
-  if (normalized.isEmpty) {
+  if (text.trim().isEmpty) {
     return const [''];
   }
 
-  final words = normalized.split(RegExp(r'\s+'));
   final lines = <String>[];
-  var current = '';
+  for (final rawParagraph in text.split('\n')) {
+    final paragraph = rawParagraph.trim();
+    if (paragraph.isEmpty) {
+      lines.add('');
+      continue;
+    }
+    final words = paragraph.split(RegExp(r'\s+'));
+    var current = '';
 
-  for (final word in words) {
-    if (current.isEmpty) {
-      if (_estimateTextWidth(word, fontWidth) <= maxWidth) {
+    for (final word in words) {
+      if (current.isEmpty) {
+        if (_measurePreviewTextWidth(word, style, scaleY: scaleY) <= maxWidth) {
+          current = word;
+        } else {
+          final pieces = _breakLongWord(
+            word,
+            maxWidth: maxWidth,
+            style: style,
+            scaleY: scaleY,
+          );
+          lines.addAll(pieces.take(math.max(0, pieces.length - 1)));
+          current = pieces.isEmpty ? '' : pieces.last;
+        }
+        continue;
+      }
+
+      final candidate = '$current $word';
+      if (_measurePreviewTextWidth(candidate, style, scaleY: scaleY) <=
+          maxWidth) {
+        current = candidate;
+        continue;
+      }
+
+      lines.add(current);
+      if (_measurePreviewTextWidth(word, style, scaleY: scaleY) <= maxWidth) {
         current = word;
       } else {
-        lines.addAll(
-          _breakLongWord(word, maxWidth: maxWidth, fontWidth: fontWidth),
+        final pieces = _breakLongWord(
+          word,
+          maxWidth: maxWidth,
+          style: style,
+          scaleY: scaleY,
         );
+        lines.addAll(pieces.take(math.max(0, pieces.length - 1)));
+        current = pieces.isEmpty ? '' : pieces.last;
       }
-      continue;
     }
 
-    final candidate = '$current $word';
-    if (_estimateTextWidth(candidate, fontWidth) <= maxWidth) {
-      current = candidate;
-      continue;
+    if (current.isNotEmpty) {
+      lines.add(current);
     }
-
-    lines.add(current);
-    if (_estimateTextWidth(word, fontWidth) <= maxWidth) {
-      current = word;
-    } else {
-      final pieces = _breakLongWord(
-        word,
-        maxWidth: maxWidth,
-        fontWidth: fontWidth,
-      );
-      lines.addAll(pieces.take(math.max(0, pieces.length - 1)));
-      current = pieces.isEmpty ? '' : pieces.last;
-    }
-  }
-
-  if (current.isNotEmpty) {
-    lines.add(current);
   }
 
   return lines.isEmpty ? const [''] : lines;
@@ -814,7 +867,8 @@ List<String> _wrapText(
 List<String> _breakLongWord(
   String word, {
   required int maxWidth,
-  required int fontWidth,
+  required TextStyle style,
+  required double scaleY,
 }) {
   final pieces = <String>[];
   var current = '';
@@ -823,7 +877,7 @@ List<String> _breakLongWord(
     final char = String.fromCharCode(rune);
     final candidate = '$current$char';
     if (current.isNotEmpty &&
-        _estimateTextWidth(candidate, fontWidth) > maxWidth) {
+        _measurePreviewTextWidth(candidate, style, scaleY: scaleY) > maxWidth) {
       pieces.add(current);
       current = char;
     } else {
@@ -836,6 +890,24 @@ List<String> _breakLongWord(
   }
 
   return pieces;
+}
+
+int _measurePreviewTextWidth(
+  String text,
+  TextStyle style, {
+  required double scaleY,
+}) {
+  if (text.isEmpty) {
+    return 1;
+  }
+
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: TextDirection.ltr,
+    maxLines: 1,
+  )..layout();
+
+  return math.max(1, (painter.width / scaleY).ceil());
 }
 
 class _BarcodePainter extends CustomPainter {

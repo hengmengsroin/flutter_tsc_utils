@@ -11,7 +11,9 @@ import 'label_size.dart';
 import 'rendered_text_options.dart';
 import 'text_style.dart';
 
+/// High-level builder that composes a label from declarative commands.
 class TscLabelGenerator {
+  /// Creates a declarative label generator.
   TscLabelGenerator({
     required this.config,
     required this.commands,
@@ -19,16 +21,25 @@ class TscLabelGenerator {
     this.codec = latin1,
   });
 
+  /// Base printer configuration for the label.
   final TscLabelConfiguration config;
+
+  /// Ordered commands used to draw label content.
   final List<TscLabelCommand> commands;
+
+  /// New-line sequence used by the underlying command generator.
   final String newLine;
+
+  /// Text encoding used for generated command output.
   final Encoding codec;
 
+  /// Builds the TSPL output as a string.
   Future<String> build() async {
     final bytes = await buildBytes();
     return codec.decode(bytes);
   }
 
+  /// Builds the TSPL output as raw bytes.
   Future<Uint8List> buildBytes() async {
     final generator = TscGenerator(newLine: newLine, codec: codec);
     config.apply(generator);
@@ -43,7 +54,9 @@ class TscLabelGenerator {
   }
 }
 
+/// Global label settings applied before drawing commands.
 class TscLabelConfiguration {
+  /// Creates a label configuration.
   const TscLabelConfiguration({
     required this.printWidth,
     required this.labelLength,
@@ -61,21 +74,49 @@ class TscLabelConfiguration {
     this.sets = 1,
   });
 
+  /// Printable width.
   final num printWidth;
+
+  /// Label length.
   final num labelLength;
+
+  /// Measurement unit used for size and gap.
   final TscUnit unit;
+
+  /// Gap height between labels.
   final num gap;
+
+  /// Gap sensor offset.
   final num gapOffset;
+
+  /// Optional print density.
   final TscPrintDensity? printDensity;
+
+  /// Print direction.
   final TscDirection direction;
+
+  /// Mirror mode.
   final TscMirror mirror;
+
+  /// X origin reference.
   final int referenceX;
+
+  /// Y origin reference.
   final int referenceY;
+
+  /// Whether to clear print buffer before drawing.
   final bool clearBuffer;
+
+  /// Optional code page name.
   final String? codePage;
+
+  /// Number of copies.
   final int copies;
+
+  /// Number of sets.
   final int sets;
 
+  /// Applies this configuration to [generator].
   void apply(TscGenerator generator) {
     generator
       ..size(TscLabelSize(printWidth, labelLength, unit: unit))
@@ -99,9 +140,12 @@ class TscLabelConfiguration {
   }
 }
 
+/// Horizontal alignment for declarative widgets.
 enum TscAlignment { left, center, right }
 
+/// Runtime layout context passed to declarative commands.
 class TscBuildContext {
+  /// Creates a build context.
   const TscBuildContext({
     required this.originX,
     required this.originY,
@@ -110,6 +154,7 @@ class TscBuildContext {
     this.cursorY = 0,
   });
 
+  /// Creates a root context from [config].
   factory TscBuildContext.root(TscLabelConfiguration config) {
     return TscBuildContext(
       originX: 0,
@@ -119,12 +164,22 @@ class TscBuildContext {
     );
   }
 
+  /// Absolute x-origin for the current context.
   final int originX;
+
+  /// Absolute y-origin for the current context.
   final int originY;
+
+  /// Available width in dots.
   final int width;
+
+  /// Available height in dots.
   final int height;
+
+  /// Current vertical cursor in dots.
   final int cursorY;
 
+  /// Returns a copy with updated cursor.
   TscBuildContext withCursor(int value) {
     return TscBuildContext(
       originX: originX,
@@ -135,6 +190,7 @@ class TscBuildContext {
     );
   }
 
+  /// Returns a nested context offset from the current one.
   TscBuildContext nested({
     int x = 0,
     int y = 0,
@@ -152,17 +208,24 @@ class TscBuildContext {
   }
 }
 
+/// Result of laying out a declarative command.
 class TscLayoutResult {
+  /// Creates a layout result.
   const TscLayoutResult({this.height = 0});
 
+  /// Vertical space consumed by this command.
   final int height;
 }
 
+/// Base class for declarative label commands.
 abstract class TscLabelCommand {
+  /// Creates a label command.
   const TscLabelCommand();
 
+  /// Applies this command without layout context.
   FutureOr<void> apply(TscGenerator generator) {}
 
+  /// Applies this command with layout context information.
   FutureOr<TscLayoutResult> applyWithContext(
     TscGenerator generator,
     TscBuildContext context,
@@ -172,6 +235,7 @@ abstract class TscLabelCommand {
   }
 }
 
+/// Declarative text command.
 class TscText extends TscLabelCommand {
   const TscText({
     this.x,
@@ -215,6 +279,7 @@ class TscText extends TscLabelCommand {
   }
 }
 
+/// Declarative 1D barcode command.
 class TscBarcode extends TscLabelCommand {
   const TscBarcode({
     this.x,
@@ -282,6 +347,7 @@ class TscBarcode extends TscLabelCommand {
   }
 }
 
+/// Declarative QR code command.
 class TscQrCode extends TscLabelCommand {
   const TscQrCode({
     this.x,
@@ -326,6 +392,7 @@ class TscQrCode extends TscLabelCommand {
   }
 }
 
+/// Declarative bitmap draw command.
 class TscBitmap extends TscLabelCommand {
   const TscBitmap({
     this.x,
@@ -357,6 +424,7 @@ class TscBitmap extends TscLabelCommand {
   }
 }
 
+/// Declarative rendered-text command.
 class TscRenderedText extends TscLabelCommand {
   const TscRenderedText({
     this.x,
@@ -386,6 +454,7 @@ class TscRenderedText extends TscLabelCommand {
   }
 }
 
+/// Horizontal separator line.
 class TscSeparator extends TscLabelCommand {
   const TscSeparator({
     required this.y,
@@ -415,6 +484,7 @@ class TscSeparator extends TscLabelCommand {
   }
 }
 
+/// Vertical stack layout command.
 class TscColumn extends TscLabelCommand {
   const TscColumn({required this.children, this.spacing = 8});
 
@@ -447,6 +517,7 @@ class TscColumn extends TscLabelCommand {
   }
 }
 
+/// Grid column definition.
 class TscGridCol {
   const TscGridCol({required this.width, required this.child});
 
@@ -454,6 +525,7 @@ class TscGridCol {
   final TscLabelCommand child;
 }
 
+/// Grid row layout command.
 class TscGridRow extends TscLabelCommand {
   const TscGridRow({
     required this.y,
@@ -491,6 +563,7 @@ class TscGridRow extends TscLabelCommand {
   }
 }
 
+/// Table header cell configuration.
 class TscTableHeader {
   const TscTableHeader(
     this.text, {
@@ -505,6 +578,7 @@ class TscTableHeader {
   final int fontWidth;
 }
 
+/// Declarative table command.
 class TscTable extends TscLabelCommand {
   const TscTable({
     required this.y,
@@ -694,6 +768,7 @@ class TscTable extends TscLabelCommand {
   }
 }
 
+/// Section block with heading and list lines.
 class TscReceiptSection extends TscLabelCommand {
   const TscReceiptSection({
     required this.y,
@@ -745,6 +820,7 @@ class TscReceiptSection extends TscLabelCommand {
   }
 }
 
+/// One total line entry used by [TscReceiptTotals].
 class TscReceiptTotalLine {
   const TscReceiptTotalLine({
     required this.label,
@@ -761,6 +837,7 @@ class TscReceiptTotalLine {
   final bool emphasis;
 }
 
+/// Totals block for receipts.
 class TscReceiptTotals extends TscLabelCommand {
   const TscReceiptTotals({
     required this.y,
@@ -835,6 +912,7 @@ class TscReceiptTotals extends TscLabelCommand {
   }
 }
 
+/// Injects a raw TSPL command line.
 class TscRawCommand extends TscLabelCommand {
   const TscRawCommand(this.command);
 

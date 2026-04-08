@@ -1,3 +1,4 @@
+/// Measurement unit used by TSPL size and spacing commands.
 enum TscUnit {
   inch(''),
   mm(' mm'),
@@ -5,9 +6,11 @@ enum TscUnit {
 
   const TscUnit(this.suffix);
 
+  /// Suffix token appended to numeric values in TSPL commands.
   final String suffix;
 }
 
+/// Target memory area for file/program operations.
 enum TscMemory {
   dram(''),
   flash('F'),
@@ -15,36 +18,44 @@ enum TscMemory {
 
   const TscMemory(this.value);
 
+  /// Command token expected by the printer for this memory type.
   final String value;
 }
 
+/// Two-state on/off value used by `SET` commands.
 enum TscToggle {
   on('ON'),
   off('OFF');
 
   const TscToggle(this.value);
 
+  /// Command token expected by the printer for this toggle.
   final String value;
 }
 
+/// Print direction for label output.
 enum TscDirection {
   forward(0),
   backward(1);
 
   const TscDirection(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// Mirroring mode used by the `DIRECTION` command.
 enum TscMirror {
   normal(0),
   mirrored(1);
 
   const TscMirror(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// Rotation angle used by text, barcode, and other draw commands.
 enum TscRotation {
   angle0(0),
   angle90(90),
@@ -53,9 +64,11 @@ enum TscRotation {
 
   const TscRotation(this.value);
 
+  /// Rotation angle in degrees.
   final int value;
 }
 
+/// Horizontal alignment used by text and barcode commands.
 enum TscTextAlignment {
   left(0),
   center(1),
@@ -63,9 +76,11 @@ enum TscTextAlignment {
 
   const TscTextAlignment(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// Alignment mode used by multiline block text.
 enum TscBlockAlignment {
   left('LEFT'),
   center('CENTER'),
@@ -74,9 +89,11 @@ enum TscBlockAlignment {
 
   const TscBlockAlignment(this.value);
 
+  /// Command token expected by the printer for this alignment.
   final String value;
 }
 
+/// Built-in and external fonts accepted by TSC printers.
 enum TscFont {
   font1('1'),
   font2('2'),
@@ -92,9 +109,11 @@ enum TscFont {
 
   const TscFont(this.value);
 
+  /// Command token used as the font identifier.
   final String value;
 }
 
+/// Human-readable text placement for barcode labels.
 enum TscReadable {
   hidden(0),
   above(1),
@@ -103,9 +122,11 @@ enum TscReadable {
 
   const TscReadable(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// Supported 1D barcode symbologies.
 enum TscBarcodeType {
   code128('128'),
   code128M('128M'),
@@ -139,9 +160,11 @@ enum TscBarcodeType {
 
   const TscBarcodeType(this.value);
 
+  /// Command token expected by the printer for this barcode type.
   final String value;
 }
 
+/// Print darkness level from light (`d0`) to dark (`d15`).
 enum TscPrintDensity {
   d0(0),
   d1(1),
@@ -162,9 +185,11 @@ enum TscPrintDensity {
 
   const TscPrintDensity(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// Blend mode used by `BITMAP` drawing.
 enum TscBitmapMode {
   overwrite(0),
   or(1),
@@ -172,9 +197,11 @@ enum TscBitmapMode {
 
   const TscBitmapMode(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// Rewind mode used by the `SET REWIND` command.
 enum TscRewindMode {
   on('ON'),
   off('OFF'),
@@ -182,9 +209,11 @@ enum TscRewindMode {
 
   const TscRewindMode(this.value);
 
+  /// Command token expected by the printer for this mode.
   final String value;
 }
 
+/// QR code error correction level.
 enum TscQrErrorCorrection {
   low('L'),
   medium('M'),
@@ -193,9 +222,11 @@ enum TscQrErrorCorrection {
 
   const TscQrErrorCorrection(this.value);
 
+  /// Command token expected by the printer for this level.
   final String value;
 }
 
+/// QR code cell size.
 enum TscQrCellWidth {
   size1(1),
   size2(2),
@@ -210,29 +241,36 @@ enum TscQrCellWidth {
 
   const TscQrCellWidth(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// PDF417 payload compression mode.
 enum TscPdf417CompressionMode {
   auto(0),
   binary(1);
 
   const TscPdf417CompressionMode(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// Shape preference for Data Matrix symbols.
 enum TscDataMatrixShape {
   square(0),
   rectangular(1);
 
   const TscDataMatrixShape(this.value);
 
+  /// Integer value encoded in TSPL command arguments.
   final int value;
 }
 
+/// Image fitting strategy when drawing into a fixed box.
 enum TscImageFit { contain, cover, fill, none, scaleDown }
 
+/// Anchor point used for alignment inside a container.
 enum TscAnchor {
   topLeft,
   topCenter,
@@ -245,6 +283,7 @@ enum TscAnchor {
   bottomRight,
 }
 
+/// Built-in self-test page variants.
 enum TscSelfTestPage {
   full(''),
   pattern('PATTERN'),
@@ -257,6 +296,7 @@ enum TscSelfTestPage {
 
   const TscSelfTestPage(this.value);
 
+  /// Command token expected by the printer for this page.
   final String value;
 }
 

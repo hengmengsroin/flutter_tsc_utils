@@ -1,3 +1,7 @@
+## 0.2.2
+
+- Improved public API documentation coverage with Dartdoc comments across generator, declarative, enum, and options APIs.
+
 ## 0.2.1
 
 - Improved `TscPreview` rendering on narrow layouts by keeping the label preview readable and allowing horizontal inspection for wider labels.

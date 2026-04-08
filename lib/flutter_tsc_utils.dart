@@ -1,3 +1,6 @@
+/// Utilities for generating TSPL/TSPL2 commands for TSC-compatible printers.
+library;
+
 export 'src/declarative_generator.dart';
 export 'src/enums.dart';
 export 'src/generator.dart';

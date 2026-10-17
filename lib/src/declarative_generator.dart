@@ -253,6 +253,9 @@ class TscText extends TscLabelCommand {
   final TscTextStyle style;
   final int? fontHeight;
   final int? fontWidth;
+
+  /// Horizontal placement. [x] is the printer anchor for this alignment.
+  /// When [x] is omitted, the anchor is the matching edge of the layout width.
   final TscAlignment? alignment;
 
   @override
@@ -268,10 +271,8 @@ class TscText extends TscLabelCommand {
       alignment: _toTextAlignment(alignment) ?? style.alignment,
     );
 
-    final estimatedWidth = _estimateTextWidth(text, effectiveFontWidth);
     final drawX =
-        context.originX +
-        (x ?? _resolveAlignedX(context.width, estimatedWidth, alignment));
+        context.originX + _resolveAnchorX(context.width, x, alignment);
     final drawY = context.originY + (y ?? context.cursorY);
 
     generator.text(drawX, drawY, text, style: resolvedStyle);
@@ -307,6 +308,8 @@ class TscBarcode extends TscLabelCommand {
   final TscRotation rotation;
   final int narrow;
   final int wide;
+
+  /// Horizontal placement. [x] is the printer anchor for this alignment.
   final TscAlignment? alignment;
 
   @override
@@ -314,10 +317,8 @@ class TscBarcode extends TscLabelCommand {
     TscGenerator generator,
     TscBuildContext context,
   ) {
-    final estimatedWidth = math.max(120, data.length * (narrow + wide) * 6);
     final drawX =
-        context.originX +
-        (x ?? _resolveAlignedX(context.width, estimatedWidth, alignment));
+        context.originX + _resolveAnchorX(context.width, x, alignment);
     final drawY = context.originY + (y ?? context.cursorY);
 
     generator.barcode(
@@ -365,6 +366,8 @@ class TscQrCode extends TscLabelCommand {
   final TscQrErrorCorrection ecc;
   final TscQrCellWidth cellWidth;
   final TscRotation rotation;
+
+  /// Horizontal placement. [x] is the printer anchor for this alignment.
   final TscAlignment? alignment;
 
   @override
@@ -374,8 +377,7 @@ class TscQrCode extends TscLabelCommand {
   ) {
     final estimatedSize = cellWidth.value * 24;
     final drawX =
-        context.originX +
-        (x ?? _resolveAlignedX(context.width, estimatedSize, alignment));
+        context.originX + _resolveAnchorX(context.width, x, alignment);
     final drawY = context.originY + (y ?? context.cursorY);
 
     generator.qrCode(
@@ -662,7 +664,12 @@ class TscTable extends TscLabelCommand {
         columnWidths: columnPixelWidths,
         rowHeight: rowHeight,
         cells: row,
-        alignments: List.filled(row.length, TscAlignment.left),
+        alignments: [
+          for (var column = 0; column < columnPixelWidths.length; column++)
+            column < headers.length
+                ? headers[column].alignment
+                : TscAlignment.left,
+        ],
         fontHeights: List.filled(row.length, dataFontHeight),
         fontWidths: List.filled(row.length, dataFontWidth),
         borderThickness: borderThickness,
@@ -1012,11 +1019,17 @@ List<String> _breakLongWord(
   return pieces;
 }
 
-int _resolveAlignedX(int width, int itemWidth, TscAlignment? alignment) {
+/// TSPL anchor for [alignment]. An explicit [x] is that anchor.
+/// Otherwise the anchor is the left edge, midpoint, or right edge of [width].
+int _resolveAnchorX(int width, int? x, TscAlignment? alignment) {
+  if (x != null) {
+    return x;
+  }
+
   return switch (alignment ?? TscAlignment.left) {
     TscAlignment.left => 0,
-    TscAlignment.center => math.max(0, (width - itemWidth) ~/ 2),
-    TscAlignment.right => math.max(0, width - itemWidth),
+    TscAlignment.center => width ~/ 2,
+    TscAlignment.right => width,
   };
 }
 

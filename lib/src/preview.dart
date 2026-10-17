@@ -220,13 +220,12 @@ class _PreviewCanvas extends StatelessWidget {
         textStyle,
         scaleY: scaleY,
       );
-      final localX =
-          command.x ??
-          _resolveAlignedX(
-            previewContext.width,
-            estimatedWidth,
-            command.alignment,
-          );
+      final localX = _previewLeft(
+        x: command.x,
+        availableWidth: previewContext.width,
+        itemWidth: estimatedWidth,
+        alignment: command.alignment,
+      );
       final localY = command.y ?? previewContext.cursorY;
       return _PreviewBuildResult(
         widgets: [
@@ -418,23 +417,17 @@ class _PreviewCanvas extends StatelessWidget {
     }
 
     if (command is TscBarcode) {
-      final localX =
-          command.x ??
-          _resolveAlignedX(
-            previewContext.width,
-            math
-                .max(
-                  96,
-                  command.data.length * (command.narrow + command.wide) * 3,
-                )
-                .round(),
-            command.alignment,
-          );
-      final localY = command.y ?? previewContext.cursorY;
       final barcodeWidth = math.max(
         96.0,
         command.data.length * (command.narrow + command.wide) * 3.0,
       );
+      final localX = _previewLeft(
+        x: command.x,
+        availableWidth: previewContext.width,
+        itemWidth: barcodeWidth.round(),
+        alignment: command.alignment,
+      );
+      final localY = command.y ?? previewContext.cursorY;
       return _PreviewBuildResult(
         widgets: [
           Positioned(
@@ -482,13 +475,12 @@ class _PreviewCanvas extends StatelessWidget {
 
     if (command is TscQrCode) {
       final size = command.cellWidth.value * 24.0;
-      final localX =
-          command.x ??
-          _resolveAlignedX(
-            previewContext.width,
-            size.round(),
-            command.alignment,
-          );
+      final localX = _previewLeft(
+        x: command.x,
+        availableWidth: previewContext.width,
+        itemWidth: size.round(),
+        alignment: command.alignment,
+      );
       final localY = command.y ?? previewContext.cursorY;
       return _PreviewBuildResult(
         widgets: [
@@ -693,7 +685,12 @@ class _PreviewCanvas extends StatelessWidget {
       );
       drawRow(
         row,
-        List.filled(row.length, TscAlignment.left),
+        [
+          for (var column = 0; column < command.columnWidths.length; column++)
+            column < command.headers.length
+                ? command.headers[column].alignment
+                : TscAlignment.left,
+        ],
         List.filled(row.length, command.dataFontHeight),
         dataHeight,
       );
@@ -787,6 +784,23 @@ _PreviewMetrics _resolvePreviewMetrics({
     width: targetHeight * safeAspectRatio,
     height: targetHeight,
   );
+}
+
+int _previewLeft({
+  required int? x,
+  required int availableWidth,
+  required int itemWidth,
+  required TscAlignment? alignment,
+}) {
+  if (x == null) {
+    return _resolveAlignedX(availableWidth, itemWidth, alignment);
+  }
+
+  return switch (alignment) {
+    null || TscAlignment.left => x,
+    TscAlignment.center => x - itemWidth ~/ 2,
+    TscAlignment.right => x - itemWidth,
+  };
 }
 
 int _resolveAlignedX(int width, int itemWidth, TscAlignment? alignment) {

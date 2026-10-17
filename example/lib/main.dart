@@ -120,9 +120,16 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
             padding: 4,
           ),
         ),
+        const TscText(x: 24, y: 300, text: 'Total'),
+        const TscText(
+          x: 560,
+          y: 300,
+          text: '\$24.00',
+          alignment: TscAlignment.right,
+        ),
         const TscText(
           x: 24,
-          y: 330,
+          y: 348,
           text: 'Khmer text is rendered by Flutter and sent as a bitmap.',
         ),
       ],

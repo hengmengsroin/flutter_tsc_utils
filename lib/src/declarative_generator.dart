@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import 'enums.dart';
 import 'generator.dart';
 import 'label_size.dart';
+import 'options.dart';
 import 'rendered_text_options.dart';
 import 'text_style.dart';
 
@@ -63,6 +64,8 @@ class TscLabelConfiguration {
     this.unit = TscUnit.dot,
     this.gap = 0,
     this.gapOffset = 0,
+    this.offset,
+    this.speed,
     this.printDensity,
     this.direction = TscDirection.forward,
     this.mirror = TscMirror.normal,
@@ -72,6 +75,13 @@ class TscLabelConfiguration {
     this.codePage,
     this.copies = 1,
     this.sets = 1,
+    this.peel,
+    this.tear,
+    this.back,
+    this.ribbon,
+    this.rewind,
+    this.cutter,
+    this.partialCutter,
   });
 
   /// Printable width.
@@ -88,6 +98,12 @@ class TscLabelConfiguration {
 
   /// Gap sensor offset.
   final num gapOffset;
+
+  /// Optional vertical print offset, in [unit].
+  final num? offset;
+
+  /// Optional print speed in inches per second.
+  final num? speed;
 
   /// Optional print density.
   final TscPrintDensity? printDensity;
@@ -116,12 +132,39 @@ class TscLabelConfiguration {
   /// Number of sets.
   final int sets;
 
+  /// Optional `SET PEEL` state.
+  final TscToggle? peel;
+
+  /// Optional `SET TEAR` state.
+  final TscToggle? tear;
+
+  /// Optional `SET BACK` state.
+  final TscToggle? back;
+
+  /// Optional `SET RIBBON` state.
+  final TscToggle? ribbon;
+
+  /// Optional `SET REWIND` mode.
+  final TscRewindMode? rewind;
+
+  /// Optional full-cutter behavior.
+  final TscCutterSetting? cutter;
+
+  /// Optional partial-cutter behavior.
+  final TscCutterSetting? partialCutter;
+
   /// Applies this configuration to [generator].
   void apply(TscGenerator generator) {
     generator
       ..size(TscLabelSize(printWidth, labelLength, unit: unit))
       ..gap(gap, gapOffset, unit: unit);
 
+    if (offset != null) {
+      generator.offset(offset!, unit: unit);
+    }
+    if (speed != null) {
+      generator.speed(speed!);
+    }
     if (printDensity != null) {
       generator.density(printDensity!.value);
     }
@@ -130,12 +173,59 @@ class TscLabelConfiguration {
       ..direction(direction, mirror: mirror)
       ..reference(referenceX, referenceY);
 
+    if (peel != null) {
+      generator.setPeel(peel!);
+    }
+    if (tear != null) {
+      generator.setTear(tear!);
+    }
+    if (back != null) {
+      generator.setBack(back!);
+    }
+    if (ribbon != null) {
+      generator.setRibbon(ribbon!);
+    }
+    if (rewind != null) {
+      generator.setRewind(rewind!);
+    }
+    cutter?.apply(generator);
+    partialCutter?.apply(generator, partial: true);
+
     if (codePage != null && codePage!.isNotEmpty) {
       generator.codePage(codePage!);
     }
 
     if (clearBuffer) {
       generator.cls();
+    }
+  }
+}
+
+/// Cutter behavior for `SET CUTTER` and `SET PARTIAL_CUTTER`.
+class TscCutterSetting {
+  /// Disables the cutter.
+  const TscCutterSetting.off() : _every = null, batch = false;
+
+  /// Cuts after every [every] labels.
+  const TscCutterSetting.every(int every) : _every = every, batch = false;
+
+  /// Cuts once when the print job finishes.
+  const TscCutterSetting.batch() : _every = null, batch = true;
+
+  final int? _every;
+
+  /// Label interval for counted cuts, or null for off/batch modes.
+  int? get every => _every;
+
+  /// Whether this setting uses batch mode.
+  final bool batch;
+
+  /// Applies this setting to [generator].
+  void apply(TscGenerator generator, {bool partial = false}) {
+    if (partial) {
+      generator.setPartialCutter(every: every, batch: batch);
+    } else {
+      generator.setCutter(every: every, batch: batch);
     }
   }
 }
@@ -909,6 +999,330 @@ class TscReceiptTotals extends TscLabelCommand {
     }
 
     return TscLayoutResult(height: currentY - y);
+  }
+}
+
+/// Filled rectangle drawn with the `BAR` command.
+class TscBar extends TscLabelCommand {
+  /// Creates a filled rectangle.
+  const TscBar({this.x, this.y, required this.width, required this.height});
+
+  /// Left edge in dots. Defaults to the current origin.
+  final int? x;
+
+  /// Top edge in dots. Defaults to the layout cursor.
+  final int? y;
+
+  /// Rectangle width in dots.
+  final int width;
+
+  /// Rectangle height in dots.
+  final int height;
+
+  @override
+  FutureOr<TscLayoutResult> applyWithContext(
+    TscGenerator generator,
+    TscBuildContext context,
+  ) {
+    generator.bar(
+      context.originX + (x ?? 0),
+      context.originY + (y ?? context.cursorY),
+      width,
+      height,
+    );
+    return TscLayoutResult(height: y == null ? height : 0);
+  }
+}
+
+/// Rectangular outline drawn with the `BOX` command.
+class TscBox extends TscLabelCommand {
+  /// Creates a rectangular outline.
+  const TscBox({
+    this.x,
+    this.y,
+    required this.width,
+    required this.height,
+    this.thickness = 1,
+  });
+
+  /// Left edge in dots. Defaults to the current origin.
+  final int? x;
+
+  /// Top edge in dots. Defaults to the layout cursor.
+  final int? y;
+
+  /// Box width in dots. The TSPL end coordinate is origin plus this width.
+  final int width;
+
+  /// Box height in dots. The TSPL end coordinate is origin plus this height.
+  final int height;
+
+  /// Stroke thickness in dots.
+  final int thickness;
+
+  @override
+  FutureOr<TscLayoutResult> applyWithContext(
+    TscGenerator generator,
+    TscBuildContext context,
+  ) {
+    final drawX = context.originX + (x ?? 0);
+    final drawY = context.originY + (y ?? context.cursorY);
+    generator.box(
+      drawX,
+      drawY,
+      drawX + width,
+      drawY + height,
+      thickness: thickness,
+    );
+    return TscLayoutResult(height: y == null ? height : 0);
+  }
+}
+
+/// Multi-line text region drawn with the `BLOCK` command.
+class TscBlock extends TscLabelCommand {
+  /// Creates a block of wrapped text.
+  const TscBlock({
+    this.x,
+    this.y,
+    required this.width,
+    required this.height,
+    required this.text,
+    this.style = const TscTextStyle(),
+    this.fontHeight,
+    this.fontWidth,
+    this.space,
+    this.alignment = TscBlockAlignment.left,
+    this.fit = false,
+  });
+
+  /// Left edge in dots. Defaults to the current origin.
+  final int? x;
+
+  /// Top edge in dots. Defaults to the layout cursor.
+  final int? y;
+
+  /// Block width in dots.
+  final int width;
+
+  /// Block height in dots.
+  final int height;
+
+  /// Text drawn inside the block.
+  final String text;
+
+  /// Base printer font and rotation.
+  final TscTextStyle style;
+
+  /// Optional font height in dots. Overrides [style] y-multiplier.
+  final int? fontHeight;
+
+  /// Optional font width in dots. Overrides [style] x-multiplier.
+  final int? fontWidth;
+
+  /// Extra space between lines, in dots.
+  final int? space;
+
+  /// Horizontal alignment inside the block.
+  final TscBlockAlignment alignment;
+
+  /// Whether the printer should fit the text into the block.
+  final bool fit;
+
+  @override
+  FutureOr<TscLayoutResult> applyWithContext(
+    TscGenerator generator,
+    TscBuildContext context,
+  ) {
+    final effectiveFontHeight = fontHeight ?? style.yMultiplier * 24;
+    final effectiveFontWidth = fontWidth ?? style.xMultiplier * 24;
+    final resolvedStyle = style.copyWith(
+      xMultiplier: _fontSizeToMultiplier(effectiveFontWidth),
+      yMultiplier: _fontSizeToMultiplier(effectiveFontHeight),
+    );
+    generator.block(
+      context.originX + (x ?? 0),
+      context.originY + (y ?? context.cursorY),
+      width,
+      height,
+      text,
+      style: resolvedStyle,
+      space: space,
+      alignment: alignment,
+      fit: fit,
+    );
+    return TscLayoutResult(height: y == null ? height : 0);
+  }
+}
+
+/// Clears a rectangle in the image buffer with the `ERASE` command.
+class TscErase extends TscLabelCommand {
+  /// Creates an erase region.
+  const TscErase({this.x, this.y, required this.width, required this.height});
+
+  /// Left edge in dots. Defaults to the current origin.
+  final int? x;
+
+  /// Top edge in dots. Defaults to the layout cursor.
+  final int? y;
+
+  /// Region width in dots.
+  final int width;
+
+  /// Region height in dots.
+  final int height;
+
+  @override
+  FutureOr<TscLayoutResult> applyWithContext(
+    TscGenerator generator,
+    TscBuildContext context,
+  ) {
+    generator.erase(
+      context.originX + (x ?? 0),
+      context.originY + (y ?? context.cursorY),
+      width,
+      height,
+    );
+    return TscLayoutResult(height: y == null ? height : 0);
+  }
+}
+
+/// Inverts a rectangle with the `REVERSE` command.
+class TscReverse extends TscLabelCommand {
+  /// Creates an invert region.
+  const TscReverse({this.x, this.y, required this.width, required this.height});
+
+  /// Left edge in dots. Defaults to the current origin.
+  final int? x;
+
+  /// Top edge in dots. Defaults to the layout cursor.
+  final int? y;
+
+  /// Region width in dots.
+  final int width;
+
+  /// Region height in dots.
+  final int height;
+
+  @override
+  FutureOr<TscLayoutResult> applyWithContext(
+    TscGenerator generator,
+    TscBuildContext context,
+  ) {
+    generator.reverse(
+      context.originX + (x ?? 0),
+      context.originY + (y ?? context.cursorY),
+      width,
+      height,
+    );
+    return TscLayoutResult(height: y == null ? height : 0);
+  }
+}
+
+/// PDF417 symbol drawn with the `PDF417` command.
+class TscPdf417 extends TscLabelCommand {
+  /// Creates a PDF417 symbol.
+  const TscPdf417({
+    this.x,
+    this.y,
+    required this.width,
+    required this.height,
+    required this.data,
+    this.rotation = TscRotation.angle0,
+    this.options = const TscPdf417Options(),
+    this.alignment,
+  });
+
+  /// Left edge in dots. Defaults to alignment within the current context.
+  final int? x;
+
+  /// Top edge in dots. Defaults to the layout cursor.
+  final int? y;
+
+  /// Symbol width in dots.
+  final int width;
+
+  /// Symbol height in dots.
+  final int height;
+
+  /// Payload encoded in the symbol.
+  final String data;
+
+  /// Symbol rotation.
+  final TscRotation rotation;
+
+  /// Optional PDF417 encoding options.
+  final TscPdf417Options options;
+
+  /// Horizontal placement when [x] is omitted.
+  final TscAlignment? alignment;
+
+  @override
+  FutureOr<TscLayoutResult> applyWithContext(
+    TscGenerator generator,
+    TscBuildContext context,
+  ) {
+    final drawX =
+        context.originX +
+        (x ?? _resolveAlignedX(context.width, width, alignment));
+    final drawY = context.originY + (y ?? context.cursorY);
+    generator.pdf417(
+      drawX,
+      drawY,
+      width,
+      height,
+      data,
+      rotation: rotation,
+      options: options,
+    );
+    return TscLayoutResult(height: y == null ? height + 8 : 0);
+  }
+}
+
+/// Data Matrix symbol drawn with the `DMATRIX` command.
+class TscDataMatrix extends TscLabelCommand {
+  /// Creates a Data Matrix symbol.
+  const TscDataMatrix({
+    this.x,
+    this.y,
+    required this.width,
+    required this.height,
+    required this.data,
+    this.options = const TscDataMatrixOptions(),
+    this.alignment,
+  });
+
+  /// Left edge in dots. Defaults to alignment within the current context.
+  final int? x;
+
+  /// Top edge in dots. Defaults to the layout cursor.
+  final int? y;
+
+  /// Symbol width in dots.
+  final int width;
+
+  /// Symbol height in dots.
+  final int height;
+
+  /// Payload encoded in the symbol.
+  final String data;
+
+  /// Optional Data Matrix encoding options.
+  final TscDataMatrixOptions options;
+
+  /// Horizontal placement when [x] is omitted.
+  final TscAlignment? alignment;
+
+  @override
+  FutureOr<TscLayoutResult> applyWithContext(
+    TscGenerator generator,
+    TscBuildContext context,
+  ) {
+    final drawX =
+        context.originX +
+        (x ?? _resolveAlignedX(context.width, width, alignment));
+    final drawY = context.originY + (y ?? context.cursorY);
+    generator.dataMatrix(drawX, drawY, width, height, data, options: options);
+    return TscLayoutResult(height: y == null ? height + 8 : 0);
   }
 }
 

@@ -9,6 +9,7 @@ This package is shaped after `flutter_esc_pos_utils`, but targets TSC label prin
 - Setup commands like `SIZE`, `GAP`, `DENSITY`, `DIRECTION`, `REFERENCE`, and `CLS`
 - Drawing commands like `TEXT`, `BARCODE`, `QRCODE`, `BAR`, and `BOX`
 - Richer label commands like `BLOCK`, `PDF417`, `DMATRIX`, `REVERSE`, `ERASE`, and `PUTBMP`
+- The same drawing commands on the declarative `TscLabelGenerator`, including live preview
 - Printer control commands like `SET PEEL`, `SET TEAR`, `SET CUTTER`, `SET PARTIAL_CUTTER`, `SET REWIND`, and `SET RIBBON`
 - File and device commands like `DOWNLOAD`, `FILES`, `KILL`, `MOVE`, `FORMFEED`, `SELFTEST`, and immediate status/query bytes
 - Bitmap rasterization for the `BITMAP` command
@@ -80,6 +81,33 @@ final generator = TscLabelGenerator(
 
 final tspl = await generator.build();
 final bytes = await generator.buildBytes();
+```
+
+Printer setup and the remaining drawing commands use the same generator:
+
+```dart
+final generator = TscLabelGenerator(
+  config: const TscLabelConfiguration(
+    printWidth: 406,
+    labelLength: 240,
+    speed: 4,
+    tear: TscToggle.on,
+    cutter: TscCutterSetting.every(1),
+  ),
+  commands: const [
+    TscBox(x: 8, y: 8, width: 390, height: 224, thickness: 2),
+    TscBlock(
+      x: 20,
+      y: 20,
+      width: 360,
+      height: 48,
+      text: 'Wrapped label text',
+      alignment: TscBlockAlignment.center,
+    ),
+    TscPdf417(x: 20, y: 80, width: 220, height: 70, data: 'PDF417'),
+    TscDataMatrix(x: 280, y: 80, width: 80, height: 80, data: 'DM'),
+  ],
+);
 ```
 
 ## Live Preview Widget

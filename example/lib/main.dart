@@ -85,8 +85,11 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
         printWidth: 600,
         labelLength: 400,
         printDensity: TscPrintDensity.d8,
+        speed: 4,
+        tear: TscToggle.on,
       ),
       commands: [
+        const TscBox(x: 8, y: 8, width: 584, height: 384, thickness: 2),
         TscText(x: 24, y: 24, text: englishText),
         const TscBarcode(
           x: 24,
@@ -120,9 +123,18 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
             padding: 4,
           ),
         ),
+        const TscBlock(
+          x: 24,
+          y: 300,
+          width: 360,
+          height: 40,
+          text: 'Boxes and wrapped blocks are part of the declarative API.',
+          fontHeight: 16,
+          fontWidth: 14,
+        ),
         const TscText(
           x: 24,
-          y: 330,
+          y: 352,
           text: 'Khmer text is rendered by Flutter and sent as a bitmap.',
         ),
       ],

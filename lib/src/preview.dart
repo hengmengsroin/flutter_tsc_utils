@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 
 import 'declarative_generator.dart';
+import 'enums.dart';
 
 class TscPreview extends StatefulWidget {
   const TscPreview({
@@ -530,6 +531,136 @@ class _PreviewCanvas extends StatelessWidget {
       );
     }
 
+    if (command is TscBar) {
+      return _positionedFill(
+        previewContext: previewContext,
+        x: command.x ?? 0,
+        y: command.y ?? previewContext.cursorY,
+        width: command.width,
+        height: command.height,
+        scaleX: scaleX,
+        scaleY: scaleY,
+        color: Colors.black,
+        consumedHeight: command.y == null ? command.height : 0,
+      );
+    }
+
+    if (command is TscBox) {
+      final localX = command.x ?? 0;
+      final localY = command.y ?? previewContext.cursorY;
+      return _PreviewBuildResult(
+        widgets: [
+          Positioned(
+            left: (previewContext.originX + localX) * scaleX,
+            top: (previewContext.originY + localY) * scaleY,
+            child: Container(
+              width: math.max(1, command.width) * scaleX,
+              height: math.max(1, command.height) * scaleY,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.black,
+                  width: math.max(1, command.thickness * scaleX),
+                ),
+              ),
+            ),
+          ),
+        ],
+        height: command.y == null ? command.height : 0,
+      );
+    }
+
+    if (command is TscBlock) {
+      return _buildBlockPreview(command, previewContext, scaleX, scaleY);
+    }
+
+    if (command is TscErase) {
+      return _positionedFill(
+        previewContext: previewContext,
+        x: command.x ?? 0,
+        y: command.y ?? previewContext.cursorY,
+        width: command.width,
+        height: command.height,
+        scaleX: scaleX,
+        scaleY: scaleY,
+        color: backgroundColor,
+        consumedHeight: command.y == null ? command.height : 0,
+      );
+    }
+
+    if (command is TscReverse) {
+      final localX = command.x ?? 0;
+      final localY = command.y ?? previewContext.cursorY;
+      return _PreviewBuildResult(
+        widgets: [
+          Positioned(
+            left: (previewContext.originX + localX) * scaleX,
+            top: (previewContext.originY + localY) * scaleY,
+            width: math.max(1, command.width) * scaleX,
+            height: math.max(1, command.height) * scaleY,
+            child: const CustomPaint(
+              painter: _ReversePainter(),
+              child: SizedBox.expand(),
+            ),
+          ),
+        ],
+        height: command.y == null ? command.height : 0,
+      );
+    }
+
+    if (command is TscPdf417) {
+      final localX =
+          command.x ??
+          _resolveAlignedX(
+            previewContext.width,
+            command.width,
+            command.alignment,
+          );
+      final localY = command.y ?? previewContext.cursorY;
+      return _PreviewBuildResult(
+        widgets: [
+          Positioned(
+            left: (previewContext.originX + localX) * scaleX,
+            top: (previewContext.originY + localY) * scaleY,
+            child: SizedBox(
+              width: math.max(1, command.width) * scaleX,
+              height: math.max(1, command.height) * scaleY,
+              child: CustomPaint(
+                painter: _Pdf417Painter(seed: command.data.hashCode),
+              ),
+            ),
+          ),
+        ],
+        height: command.y == null ? command.height + 8 : 0,
+      );
+    }
+
+    if (command is TscDataMatrix) {
+      final localX =
+          command.x ??
+          _resolveAlignedX(
+            previewContext.width,
+            command.width,
+            command.alignment,
+          );
+      final localY = command.y ?? previewContext.cursorY;
+      return _PreviewBuildResult(
+        widgets: [
+          Positioned(
+            left: (previewContext.originX + localX) * scaleX,
+            top: (previewContext.originY + localY) * scaleY,
+            child: SizedBox(
+              width: math.max(1, command.width) * scaleX,
+              height: math.max(1, command.height) * scaleY,
+              child: CustomPaint(
+                painter: _MatrixPainter(seed: command.data.hashCode),
+              ),
+            ),
+          ),
+        ],
+        height: command.y == null ? command.height + 8 : 0,
+      );
+    }
+
     if (command is TscSeparator) {
       return _PreviewBuildResult(
         widgets: [
@@ -705,6 +836,103 @@ class _PreviewCanvas extends StatelessWidget {
       height: currentY - (previewContext.originY + command.y),
     );
   }
+
+  _PreviewBuildResult _buildBlockPreview(
+    TscBlock command,
+    _PreviewLayoutContext previewContext,
+    double scaleX,
+    double scaleY,
+  ) {
+    final fontSize = math.max(
+      10.0,
+      (command.fontHeight ?? (12.0 * command.style.yMultiplier)).toDouble(),
+    );
+    final textStyle = TextStyle(
+      color: Colors.black,
+      fontSize: fontSize * scaleY,
+      fontWeight: FontWeight.w600,
+    );
+    final localX = command.x ?? 0;
+    final localY = command.y ?? previewContext.cursorY;
+    final lines = _wrapText(
+      command.text,
+      maxWidth: math.max(1, command.width),
+      style: textStyle,
+      scaleY: scaleY,
+    );
+    final lineAdvance = fontSize + (command.space ?? 0);
+
+    double lineLeft(String line) {
+      final textWidth = _measurePreviewTextWidth(
+        line,
+        textStyle,
+        scaleY: scaleY,
+      );
+      return switch (command.alignment) {
+        TscBlockAlignment.left || TscBlockAlignment.justified => 0,
+        TscBlockAlignment.center => math.max(
+          0,
+          (command.width - textWidth) / 2,
+        ),
+        TscBlockAlignment.right => math.max(
+          0,
+          command.width - textWidth.toDouble(),
+        ),
+      };
+    }
+
+    return _PreviewBuildResult(
+      widgets: [
+        Positioned(
+          left: (previewContext.originX + localX) * scaleX,
+          top: (previewContext.originY + localY) * scaleY,
+          width: math.max(1, command.width) * scaleX,
+          height: math.max(1, command.height) * scaleY,
+          child: ClipRect(
+            child: Stack(
+              children: [
+                for (var i = 0; i < lines.length; i++)
+                  if (i * lineAdvance < command.height)
+                    Positioned(
+                      left: lineLeft(lines[i]) * scaleX,
+                      top: i * lineAdvance * scaleY,
+                      child: Text(lines[i], style: textStyle, maxLines: 1),
+                    ),
+              ],
+            ),
+          ),
+        ),
+      ],
+      height: command.y == null ? command.height : 0,
+    );
+  }
+}
+
+_PreviewBuildResult _positionedFill({
+  required _PreviewLayoutContext previewContext,
+  required int x,
+  required int y,
+  required int width,
+  required int height,
+  required double scaleX,
+  required double scaleY,
+  required Color color,
+  required int consumedHeight,
+}) {
+  return _PreviewBuildResult(
+    widgets: [
+      Positioned(
+        left: (previewContext.originX + x) * scaleX,
+        top: (previewContext.originY + y) * scaleY,
+        child: Container(
+          width: math.max(1, width) * scaleX,
+          height: math.max(1, height) * scaleY,
+          color: color,
+        ),
+      ),
+    ],
+    height: consumedHeight,
+  );
 }
 
 class _PreviewLayoutContext {
@@ -984,6 +1212,91 @@ class _QrPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _QrPainter oldDelegate) {
+    return oldDelegate.seed != seed;
+  }
+}
+
+class _ReversePainter extends CustomPainter {
+  const _ReversePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..blendMode = BlendMode.difference
+        ..color = const Color(0xFFFFFFFF),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _Pdf417Painter extends CustomPainter {
+  const _Pdf417Painter({required this.seed});
+
+  final int seed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black;
+    const rows = 8;
+    final rowHeight = size.height / rows;
+    var value = seed.abs() + 3;
+
+    for (var row = 0; row < rows; row++) {
+      var x = 0.0;
+      while (x < size.width) {
+        final barWidth = (value % 3 + 1).toDouble();
+        canvas.drawRect(
+          Rect.fromLTWH(x, row * rowHeight, barWidth, rowHeight * 0.72),
+          paint,
+        );
+        x += barWidth + ((value >> 2) % 2 + 1);
+        value = (value * 1103515245 + 12345) & 0x7fffffff;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _Pdf417Painter oldDelegate) {
+    return oldDelegate.seed != seed;
+  }
+}
+
+class _MatrixPainter extends CustomPainter {
+  const _MatrixPainter({required this.seed});
+
+  final int seed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black;
+    const modules = 16;
+    final cell = size.shortestSide / modules;
+    var value = seed.abs() + 11;
+
+    for (var row = 0; row < modules; row++) {
+      for (var col = 0; col < modules; col++) {
+        value = (value * 1664525 + 1013904223) & 0x7fffffff;
+        final border =
+            col == 0 ||
+            row == modules - 1 ||
+            (row == 0 && col.isEven) ||
+            (col == modules - 1 && row.isEven);
+        if (border || value.isEven) {
+          canvas.drawRect(
+            Rect.fromLTWH(col * cell, row * cell, cell, cell),
+            paint,
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MatrixPainter oldDelegate) {
     return oldDelegate.seed != seed;
   }
 }

@@ -1,3 +1,9 @@
+## 0.2.3
+
+- Added optional printer setup on `TscLabelConfiguration` for speed, offset, peel, tear, backfeed, ribbon, rewind, and cutter behavior.
+- Added declarative drawing commands `TscBar`, `TscBox`, `TscBlock`, `TscErase`, `TscReverse`, `TscPdf417`, and `TscDataMatrix`.
+- `TscPreview` now renders those drawing commands alongside the generated TSPL.
+
 ## 0.2.2
 
 - Improved public API documentation coverage with Dartdoc comments across generator, declarative, enum, and options APIs.

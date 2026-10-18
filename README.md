@@ -293,6 +293,17 @@ Future<void> printKhmer() async {
 }
 ```
 
+## Publishing
+
+Tags named `vX.Y.Z` publish that package version to pub.dev after CI passes. The tag must match the `version` in `pubspec.yaml`. For version `0.2.4`, push `v0.2.4`.
+
+Turn this on once in the pub.dev package admin page, under Automated publishing from GitHub Actions:
+
+- Repository: `hengmengsroin/flutter_tsc_utils`
+- Tag pattern: `v{{version}}`
+
+A brand-new package still needs its first version published with `flutter pub publish`. Later versions are published by the tag workflow. No long-lived pub.dev secret is stored in GitHub.
+
 ## Example App
 
 A Flutter example app is included in [example/lib/main.dart](/Users/hengmengsroin/Documents/projects/flutter-plugins/flutter_tsc_utils/example/lib/main.dart). It provides:

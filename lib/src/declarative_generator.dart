@@ -64,6 +64,7 @@ class TscLabelConfiguration {
     this.unit = TscUnit.dot,
     this.gap = 0,
     this.gapOffset = 0,
+    this.media = TscMedia.gap,
     this.offset,
     this.speed,
     this.printDensity,
@@ -96,8 +97,11 @@ class TscLabelConfiguration {
   /// Gap height between labels.
   final num gap;
 
-  /// Gap sensor offset.
+  /// Gap sensor offset, or black-mark offset when [media] is [TscMedia.blackMark].
   final num gapOffset;
+
+  /// Label sensing mode. Defaults to [TscMedia.gap].
+  final TscMedia media;
 
   /// Optional vertical print offset, in [unit].
   final num? offset;
@@ -155,9 +159,15 @@ class TscLabelConfiguration {
 
   /// Applies this configuration to [generator].
   void apply(TscGenerator generator) {
-    generator
-      ..size(TscLabelSize(printWidth, labelLength, unit: unit))
-      ..gap(gap, gapOffset, unit: unit);
+    generator.size(TscLabelSize(printWidth, labelLength, unit: unit));
+    switch (media) {
+      case TscMedia.gap:
+        generator.gap(gap, gapOffset, unit: unit);
+      case TscMedia.blackMark:
+        generator.bline(gap, gapOffset, unit: unit);
+      case TscMedia.continuous:
+        generator.gap(0, 0, unit: unit);
+    }
 
     if (offset != null) {
       generator.offset(offset!, unit: unit);

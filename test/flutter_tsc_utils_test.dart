@@ -69,6 +69,36 @@ void main() {
     );
   });
 
+  test(
+    'declarative media selects gap, black mark, or continuous sensing',
+    () async {
+      Future<String> build(TscMedia media) {
+        return TscLabelGenerator(
+          config: TscLabelConfiguration(
+            printWidth: 200,
+            labelLength: 100,
+            gap: 3,
+            gapOffset: 1,
+            media: media,
+          ),
+          commands: const [],
+        ).build();
+      }
+
+      final gap = await build(TscMedia.gap);
+      final blackMark = await build(TscMedia.blackMark);
+      final continuous = await build(TscMedia.continuous);
+
+      expect(gap, contains('GAP 3 dot,1 dot\r\n'));
+      expect(gap, isNot(contains('BLINE ')));
+      expect(blackMark, contains('BLINE 3 dot,1 dot\r\n'));
+      expect(blackMark, isNot(contains('GAP ')));
+      expect(continuous, contains('GAP 0 dot,0 dot\r\n'));
+      expect(continuous, isNot(contains('BLINE ')));
+      expect(continuous, isNot(contains('GAP 3 ')));
+    },
+  );
+
   test('declarative configuration emits printer setup commands', () async {
     final generator = TscLabelGenerator(
       config: const TscLabelConfiguration(

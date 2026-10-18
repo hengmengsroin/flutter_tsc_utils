@@ -110,6 +110,8 @@ final generator = TscLabelGenerator(
 );
 ```
 
+`media` defaults to gap sensing. Use `TscMedia.blackMark` for black-mark stock, which emits `BLINE`, or `TscMedia.continuous` for continuous media.
+
 ## Live Preview Widget
 
 For a fast local preview in Flutter, wrap the same declarative generator in `TscPreview`:

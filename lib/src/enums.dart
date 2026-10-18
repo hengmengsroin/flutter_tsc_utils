@@ -1,3 +1,18 @@
+/// How the printer finds the next label.
+enum TscMedia {
+  /// Die-cut labels sensed with `GAP`.
+  gap,
+
+  /// Black-mark labels sensed with `BLINE`.
+  ///
+  /// The configuration gap is the mark height, and the gap offset is the
+  /// distance from the mark to the print origin.
+  blackMark,
+
+  /// Continuous media. The generator emits `GAP 0,0`.
+  continuous,
+}
+
 /// Measurement unit used by TSPL size and spacing commands.
 enum TscUnit {
   inch(''),

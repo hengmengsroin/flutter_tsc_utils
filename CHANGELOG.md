@@ -1,3 +1,7 @@
+## 0.2.5
+
+- Added `TscMedia` so declarative labels can use gap, black-mark, or continuous sensing. Black-mark stock emits `BLINE` instead of `GAP`.
+
 ## 0.2.4
 
 - Fixed declarative center and right alignment for `TscText`, `TscBarcode`, and `TscQrCode`. The generated x coordinate is now the printer anchor instead of a pre-shifted left edge that the printer aligns again.

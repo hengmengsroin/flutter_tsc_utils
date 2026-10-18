@@ -740,6 +740,69 @@ void main() {
     expect(anchored.y, 340);
   });
 
+  test('short table rows leave the missing cells blank', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 200, labelLength: 80),
+      commands: const [
+        TscTable(
+          y: 10,
+          columnWidths: [4, 4, 4],
+          headers: [
+            TscTableHeader('A'),
+            TscTableHeader('B'),
+            TscTableHeader('C'),
+          ],
+          data: [
+            ['only'],
+          ],
+        ),
+      ],
+    );
+
+    final output = await generator.build();
+
+    expect(output, contains('"only"'));
+    expect('BOX'.allMatches(output).length, 6);
+  });
+
+  testWidgets('TscPreview renders a short table row', (tester) async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 200, labelLength: 80),
+      commands: const [
+        TscTable(
+          y: 8,
+          columnWidths: [6, 6],
+          headers: [TscTableHeader('Item'), TscTableHeader('Qty')],
+          data: [
+            ['Bolt'],
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(width: 320, child: TscPreview(generator: generator)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bolt'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('quoted values escape quotes, backslashes, and line breaks', () {
+    final preview = TscGenerator().text(0, 0, 'a"b\\c\nd').preview();
+
+    expect(preview, 'TEXT 0,0,"3",0,1,1,"a\\"b\\\\c d"\r\n');
+    expect(
+      preview.split('\r\n').where((line) => line.isNotEmpty),
+      hasLength(1),
+    );
+  });
+
   test('image helper contain fit centers resized image in target box', () {
     final source = img.Image(width: 100, height: 50);
     img.fill(source, color: img.ColorRgb8(0, 0, 0));
@@ -755,6 +818,40 @@ void main() {
     expect(fitted.image.height, 200);
     expect(fitted.image.getPixel(100, 100).r, 0);
     expect(fitted.image.getPixel(100, 20).r, 255);
+  });
+
+  test('cover fit without upscaling stays inside the target box', () {
+    final source = img.Image(width: 10, height: 10);
+    img.fill(source, color: img.ColorRgb8(0, 0, 0));
+
+    final fitted = TscImageHelper.fitInto(
+      source,
+      boxWidth: 40,
+      boxHeight: 20,
+      fit: TscImageFit.cover,
+      allowUpscale: false,
+    );
+
+    expect(fitted.image.width, 40);
+    expect(fitted.image.height, 20);
+    expect(fitted.image.getPixel(20, 10).r, 0);
+  });
+
+  test('none fit clips an image that extends past the box', () {
+    final source = img.Image(width: 30, height: 10);
+    img.fill(source, color: img.ColorRgb8(0, 0, 0));
+
+    final fitted = TscImageHelper.fitInto(
+      source,
+      boxWidth: 20,
+      boxHeight: 20,
+      fit: TscImageFit.none,
+      anchor: TscAnchor.center,
+    );
+
+    expect(fitted.image.width, 20);
+    expect(fitted.image.height, 20);
+    expect(fitted.image.getPixel(10, 10).r, 0);
   });
 
   test('bitmapFitted generates TSPL bitmap for a target rect', () {

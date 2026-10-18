@@ -33,7 +33,7 @@ class TscImageHelper {
         childHeight: source.height,
         anchor: anchor,
       );
-      img.compositeImage(canvas, source, dstX: point.x, dstY: point.y);
+      _compositeWithin(canvas, source, dstX: point.x, dstY: point.y);
       return TscFittedImage(image: canvas, offset: const TscPoint(0, 0));
     }
 
@@ -69,7 +69,9 @@ class TscImageHelper {
       height: (source.height * scale).round().clamp(1, 65535),
     );
 
-    if (fit == TscImageFit.cover) {
+    if (fit == TscImageFit.cover &&
+        resized.width >= boxWidth &&
+        resized.height >= boxHeight) {
       final point = _anchorPoint(
         containerWidth: resized.width,
         containerHeight: resized.height,
@@ -95,8 +97,38 @@ class TscImageHelper {
       childHeight: resized.height,
       anchor: anchor,
     );
-    img.compositeImage(canvas, resized, dstX: point.x, dstY: point.y);
+    _compositeWithin(canvas, resized, dstX: point.x, dstY: point.y);
     return TscFittedImage(image: canvas, offset: const TscPoint(0, 0));
+  }
+
+  /// Draws [source] onto [canvas], clipping any part that falls outside.
+  static void _compositeWithin(
+    img.Image canvas,
+    img.Image source, {
+    required int dstX,
+    required int dstY,
+  }) {
+    var srcX = 0;
+    var srcY = 0;
+    var x = dstX;
+    var y = dstY;
+    if (x < 0) {
+      srcX = -x;
+      x = 0;
+    }
+    if (y < 0) {
+      srcY = -y;
+      y = 0;
+    }
+    final width = source.width - srcX;
+    final height = source.height - srcY;
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+    final visible = srcX == 0 && srcY == 0
+        ? source
+        : img.copyCrop(source, x: srcX, y: srcY, width: width, height: height);
+    img.compositeImage(canvas, visible, dstX: x, dstY: y);
   }
 
   static TscPoint _anchorPoint({

@@ -28,7 +28,14 @@ class TscCommandBuffer {
 
 String quoteTsc(String value) => '"${escapeTsc(value)}"';
 
-String escapeTsc(String value) => value.replaceAll('"', r'\"');
+String escapeTsc(String value) {
+  return value
+      .replaceAll(r'\', r'\\')
+      .replaceAll('"', r'\"')
+      .replaceAll('\r\n', ' ')
+      .replaceAll('\n', ' ')
+      .replaceAll('\r', ' ');
+}
 
 String formatTscNumber(num value) {
   if (value is int) {

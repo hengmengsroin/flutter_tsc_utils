@@ -1,3 +1,9 @@
+## 0.2.6
+
+- Fixed table generation and preview when a data row has fewer cells than columns. Missing cells stay blank instead of throwing.
+- Fixed image fitting when a `cover` image cannot be enlarged to fill the box, and when `none` places an image past the box edge.
+- Escaped backslashes and replaced line breaks in quoted TSPL values so a label string cannot break the command stream.
+
 ## 0.2.5
 
 - Added `TscMedia` so declarative labels can use gap, black-mark, or continuous sensing. Black-mark stock emits `BLINE` instead of `GAP`.

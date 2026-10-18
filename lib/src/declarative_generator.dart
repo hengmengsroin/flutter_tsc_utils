@@ -752,8 +752,8 @@ class TscTable extends TscLabelCommand {
       final rowHeight = _rowHeight(
         cells: row,
         columnWidths: columnPixelWidths,
-        fontHeights: List.filled(row.length, dataFontHeight),
-        fontWidths: List.filled(row.length, dataFontWidth),
+        fontHeights: List.filled(columnPixelWidths.length, dataFontHeight),
+        fontWidths: List.filled(columnPixelWidths.length, dataFontWidth),
         cellPadding: cellPadding,
         borderThickness: borderThickness,
       );
@@ -770,8 +770,8 @@ class TscTable extends TscLabelCommand {
                 ? headers[column].alignment
                 : TscAlignment.left,
         ],
-        fontHeights: List.filled(row.length, dataFontHeight),
-        fontWidths: List.filled(row.length, dataFontWidth),
+        fontHeights: List.filled(columnPixelWidths.length, dataFontHeight),
+        fontWidths: List.filled(columnPixelWidths.length, dataFontWidth),
         borderThickness: borderThickness,
         cellPadding: cellPadding,
       );

@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [dev]
+    branches: [main, dev]
   pull_request:
+  workflow_call:
 
 jobs:
   checks:
@@ -32,6 +33,9 @@ jobs:
 
       - name: Run tests
         run: flutter test
+
+      - name: Require a clean package tree
+        run: git diff --exit-code -- . ':(exclude)example/pubspec.lock'
 
       - name: Validate publish
         run: flutter pub publish --dry-run

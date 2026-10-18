@@ -1,8 +1,14 @@
-## 0.2.3
+## 0.2.4
 
 - Fixed declarative center and right alignment for `TscText`, `TscBarcode`, and `TscQrCode`. The generated x coordinate is now the printer anchor instead of a pre-shifted left edge that the printer aligns again.
 - Table body cells now use each column header's alignment in both TSPL output and `TscPreview`.
 - `TscPreview` treats an explicit x coordinate as that same alignment anchor.
+
+## 0.2.3
+
+- Added optional printer setup on `TscLabelConfiguration` for speed, offset, peel, tear, backfeed, ribbon, rewind, and cutter behavior.
+- Added declarative drawing commands `TscBar`, `TscBox`, `TscBlock`, `TscErase`, `TscReverse`, `TscPdf417`, and `TscDataMatrix`.
+- `TscPreview` now renders those drawing commands alongside the generated TSPL.
 
 ## 0.2.2
 

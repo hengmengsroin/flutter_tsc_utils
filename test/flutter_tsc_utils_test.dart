@@ -69,6 +69,120 @@ void main() {
     );
   });
 
+  test('declarative configuration emits printer setup commands', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(
+        printWidth: 400,
+        labelLength: 200,
+        gap: 2,
+        offset: 1,
+        speed: 4,
+        printDensity: TscPrintDensity.d8,
+        peel: TscToggle.off,
+        tear: TscToggle.on,
+        back: TscToggle.off,
+        ribbon: TscToggle.on,
+        rewind: TscRewindMode.off,
+        cutter: TscCutterSetting.every(2),
+        partialCutter: TscCutterSetting.batch(),
+      ),
+      commands: const [],
+    );
+
+    expect(
+      await generator.build(),
+      'SIZE 400 dot,200 dot\r\n'
+      'GAP 2 dot,0 dot\r\n'
+      'OFFSET 1 dot\r\n'
+      'SPEED 4\r\n'
+      'DENSITY 8\r\n'
+      'DIRECTION 0,0\r\n'
+      'REFERENCE 0,0\r\n'
+      'SET PEEL OFF\r\n'
+      'SET TEAR ON\r\n'
+      'SET BACK OFF\r\n'
+      'SET RIBBON ON\r\n'
+      'SET REWIND OFF\r\n'
+      'SET CUTTER 2\r\n'
+      'SET PARTIAL_CUTTER BATCH\r\n'
+      'CLS\r\n'
+      'PRINT 1,1\r\n',
+    );
+  });
+
+  test('declarative cutter off mode emits SET CUTTER OFF', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(
+        printWidth: 100,
+        labelLength: 50,
+        cutter: TscCutterSetting.off(),
+      ),
+      commands: const [],
+    );
+
+    expect(await generator.build(), contains('SET CUTTER OFF\r\n'));
+  });
+
+  test('declarative drawing commands emit TSPL', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 300, labelLength: 300),
+      commands: const [
+        TscBox(x: 10, y: 10, width: 200, height: 80, thickness: 2),
+        TscBar(x: 10, y: 100, width: 180, height: 8),
+        TscBlock(
+          x: 20,
+          y: 120,
+          width: 160,
+          height: 40,
+          text: 'Hello block',
+          alignment: TscBlockAlignment.center,
+        ),
+        TscReverse(x: 10, y: 170, width: 40, height: 20),
+        TscErase(x: 60, y: 170, width: 30, height: 20),
+        TscPdf417(x: 10, y: 200, width: 120, height: 40, data: 'PDF'),
+        TscDataMatrix(x: 150, y: 200, width: 40, height: 40, data: 'DM'),
+      ],
+    );
+
+    final output = await generator.build();
+
+    expect(output, contains('BOX 10,10,210,90,2'));
+    expect(output, contains('BAR 10,100,180,8'));
+    expect(
+      output,
+      contains('BLOCK 20,120,160,40,"3",0,1,1,0,CENTER,0,"Hello block"'),
+    );
+    expect(output, contains('REVERSE 10,170,40,20'));
+    expect(output, contains('ERASE 60,170,30,20'));
+    expect(output, contains('PDF417 10,200,120,40,0,P0,"PDF"'));
+    expect(output, contains('DMATRIX 150,200,40,40,R0,A0,"DM"'));
+  });
+
+  test('declarative drawing commands honor alignment and nesting', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 200, labelLength: 200),
+      commands: const [
+        TscColumn(
+          spacing: 4,
+          children: [
+            TscBar(width: 20, height: 10),
+            TscPdf417(
+              width: 40,
+              height: 20,
+              data: 'centered',
+              alignment: TscAlignment.center,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final output = await generator.build();
+
+    expect(output, contains('BAR 0,0,20,10'));
+    expect(output, contains('PDF417 80,14,40,20,0,P0,"centered"'));
+  });
+
   test('declarative generator can build printer bytes', () async {
     final source = img.Image(width: 8, height: 1);
     img.fill(source, color: img.ColorRgb8(255, 255, 255));
@@ -419,6 +533,36 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('TscPreview renders boxes, blocks, and 2D codes', (tester) async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 320, labelLength: 240),
+      commands: const [
+        TscBox(x: 8, y: 8, width: 300, height: 220, thickness: 2),
+        TscBlock(x: 20, y: 24, width: 180, height: 48, text: 'Preview block'),
+        TscBar(x: 20, y: 80, width: 120, height: 6),
+        TscPdf417(x: 20, y: 100, width: 140, height: 48, data: 'PDF417'),
+        TscDataMatrix(x: 200, y: 100, width: 64, height: 64, data: 'DM'),
+        TscReverse(x: 20, y: 180, width: 40, height: 20),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(width: 480, child: TscPreview(generator: generator)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preview block'), findsOneWidget);
+    expect(find.textContaining('BOX 8,8,308,228,2'), findsOneWidget);
+    expect(find.textContaining('BLOCK 20,24'), findsOneWidget);
+    expect(find.textContaining('PDF417 20,100'), findsOneWidget);
+    expect(find.textContaining('DMATRIX 200,100'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('TscPreview stays readable on narrow layouts', (tester) async {
     final generator = TscLabelGenerator(

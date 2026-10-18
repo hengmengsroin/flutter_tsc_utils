@@ -85,8 +85,11 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
         printWidth: 600,
         labelLength: 400,
         printDensity: TscPrintDensity.d8,
+        speed: 4,
+        tear: TscToggle.on,
       ),
       commands: [
+        const TscBox(x: 8, y: 8, width: 584, height: 384, thickness: 2),
         TscText(x: 24, y: 24, text: englishText),
         const TscBarcode(
           x: 24,
@@ -120,10 +123,19 @@ class _ExampleHomePageState extends State<ExampleHomePage> {
             padding: 4,
           ),
         ),
-        const TscText(x: 24, y: 300, text: 'Total'),
+        const TscBlock(
+          x: 24,
+          y: 268,
+          width: 340,
+          height: 40,
+          text: 'Boxes and wrapped blocks are part of the declarative API.',
+          fontHeight: 16,
+          fontWidth: 14,
+        ),
+        const TscText(x: 400, y: 276, text: 'Total'),
         const TscText(
           x: 560,
-          y: 300,
+          y: 276,
           text: '\$24.00',
           alignment: TscAlignment.right,
         ),

@@ -812,7 +812,7 @@ class _PreviewCanvas extends StatelessWidget {
     for (final row in command.data) {
       final dataHeight = rowHeight(
         row,
-        List.filled(row.length, command.dataFontHeight),
+        List.filled(command.columnWidths.length, command.dataFontHeight),
       );
       drawRow(
         row,
@@ -822,7 +822,7 @@ class _PreviewCanvas extends StatelessWidget {
                 ? command.headers[column].alignment
                 : TscAlignment.left,
         ],
-        List.filled(row.length, command.dataFontHeight),
+        List.filled(command.columnWidths.length, command.dataFontHeight),
         dataHeight,
       );
       currentY += dataHeight - command.borderThickness;

@@ -376,9 +376,60 @@ void main() {
     expect(output, contains('TEXT 0,40,"3",0,1,1,"Bill To"'));
     expect(output, contains('TEXT 0,82,"3",0,1,1,"Doe John"'));
     expect(output, contains('TEXT 40,300,"3",0,1,1,"Subtotal"'));
-    expect(output, contains('TEXT 282,300,"3",0,1,1,2,"\$136.00"'));
+    expect(output, contains('TEXT 360,300,"3",0,1,1,2,"\$136.00"'));
     expect(output, contains('BAR 40,360,320,2'));
     expect(output, contains('TEXT 40,372,"3",0,1,1,"Total"'));
+  });
+
+  test(
+    'alignment uses the printer anchor instead of a shifted left edge',
+    () async {
+      final generator = TscLabelGenerator(
+        config: const TscLabelConfiguration(printWidth: 200, labelLength: 160),
+        commands: const [
+          TscText(y: 10, text: 'End', alignment: TscAlignment.right),
+          TscText(y: 40, text: 'Mid', alignment: TscAlignment.center),
+          TscText(x: 80, y: 70, text: 'Anchor', alignment: TscAlignment.right),
+          TscBarcode(y: 90, data: '123', alignment: TscAlignment.center),
+          TscQrCode(y: 120, data: 'hi', alignment: TscAlignment.right),
+        ],
+      );
+
+      final output = await generator.build();
+
+      expect(output, contains('TEXT 200,10,"3",0,1,1,2,"End"'));
+      expect(output, contains('TEXT 100,40,"3",0,1,1,1,"Mid"'));
+      expect(output, contains('TEXT 80,70,"3",0,1,1,2,"Anchor"'));
+      expect(output, contains('BARCODE 100,90,"128",100,2,0,2,2,1,"123"'));
+      expect(output, contains('QRCODE 200,120,L,4,A,0,J3,"hi"'));
+    },
+  );
+
+  test('table body cells follow header alignment', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 200, labelLength: 120),
+      commands: const [
+        TscTable(
+          y: 10,
+          columnWidths: [6, 6],
+          headers: [
+            TscTableHeader('Item'),
+            TscTableHeader('Price', alignment: TscAlignment.right),
+          ],
+          data: [
+            ['Bolt', '\$9.00'],
+          ],
+          dataFontHeight: 18,
+          dataFontWidth: 16,
+        ),
+      ],
+    );
+
+    final output = await generator.build();
+
+    expect(output, contains('TEXT 143,'));
+    expect(output, contains('"\$9.00"'));
+    expect(output, isNot(contains('TEXT 105,')));
   });
 
   testWidgets('TscPreview renders generator content and command preview', (
@@ -453,6 +504,35 @@ void main() {
     expect(find.text('Total'), findsOneWidget);
     expect(find.textContaining('BAR 40,'), findsOneWidget);
   });
+
+  testWidgets(
+    'TscPreview places an explicit right anchor to the left of a left anchor',
+    (tester) async {
+      final generator = TscLabelGenerator(
+        config: const TscLabelConfiguration(printWidth: 300, labelLength: 120),
+        commands: const [
+          TscText(x: 180, y: 16, text: 'LEFTISH'),
+          TscText(x: 180, y: 56, text: 'RIGHT', alignment: TscAlignment.right),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(width: 420, child: TscPreview(generator: generator)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.text('RIGHT')).dx,
+        lessThan(tester.getTopLeft(find.text('LEFTISH')).dx),
+      );
+      expect(find.textContaining('TEXT 180,56'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('TscPreview renders boxes, blocks, and 2D codes', (tester) async {
     final generator = TscLabelGenerator(

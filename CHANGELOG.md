@@ -1,3 +1,11 @@
+## 0.2.7
+
+- Corrected UPC-E and checksummed MSI barcode tokens to the TSPL names `UPCE`, `UPCE+2`, `UPCE+5`, and `MSIC`.
+- Data Matrix row and column counts are now sent only as a pair. A lone column count is no longer emitted as the row count.
+- Bitmap conversion blends transparent pixels onto white before thresholding, so a transparent logo background does not print as black.
+- `khmerText` and `TscRenderedText` scale the rendered glyphs by `pixelRatio` instead of leaving them in the corner of a larger bitmap.
+- Table cells keep explicit line breaks instead of joining those lines into one wrapped paragraph.
+
 ## 0.2.6
 
 - Fixed table generation and preview when a data row has fewer cells than columns. Missing cells stay blank instead of throwing.

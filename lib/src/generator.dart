@@ -488,10 +488,16 @@ class TscGenerator {
     if (options.moduleSize != null) {
       requirePositive(options.moduleSize!, 'options.moduleSize');
     }
-    if (options.rows != null) {
-      requirePositive(options.rows!, 'options.rows');
+    final hasRows = options.rows != null;
+    final hasColumns = options.columns != null;
+    if (hasRows != hasColumns) {
+      throw ArgumentError(
+        'Data Matrix rows and columns must both be set. '
+        'The printer reads them as a pair, so a single number is taken as the row count.',
+      );
     }
-    if (options.columns != null) {
+    if (hasRows) {
+      requirePositive(options.rows!, 'options.rows');
       requirePositive(options.columns!, 'options.columns');
     }
 
@@ -694,6 +700,7 @@ class TscGenerator {
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
+    canvas.scale(options.pixelRatio);
     final backgroundPaint = Paint()..color = options.backgroundColor;
     canvas.drawRect(
       Rect.fromLTWH(0, 0, imageWidth.toDouble(), imageHeight.toDouble()),
@@ -724,7 +731,7 @@ class TscGenerator {
   }
 
   _RasterizedBitmap _rasterize(img.Image source, {required int threshold}) {
-    final grayscaleImage = img.grayscale(img.Image.from(source));
+    final grayscaleImage = img.grayscale(_flattenOnWhite(source));
     final widthBytes = (grayscaleImage.width + 7) ~/ 8;
     final paddedWidth = widthBytes * 8;
     final bytes = Uint8List(widthBytes * grayscaleImage.height);
@@ -747,6 +754,19 @@ class TscGenerator {
       height: grayscaleImage.height,
       bytes: bytes,
     );
+  }
+
+  /// Transparent pixels are stored as black RGB. Blend them onto white first
+  /// so a logo background does not print as a solid black block.
+  img.Image _flattenOnWhite(img.Image source) {
+    if (source.numChannels < 4) {
+      return img.Image.from(source);
+    }
+
+    final canvas = img.Image(width: source.width, height: source.height);
+    img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
+    img.compositeImage(canvas, source);
+    return canvas;
   }
 }
 

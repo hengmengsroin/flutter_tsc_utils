@@ -1045,12 +1045,16 @@ List<String> _wrapText(
   required TextStyle style,
   required double scaleY,
 }) {
-  if (text.trim().isEmpty) {
+  final normalized = text
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n')
+      .trim();
+  if (normalized.isEmpty) {
     return const [''];
   }
 
   final lines = <String>[];
-  for (final rawParagraph in text.split('\n')) {
+  for (final rawParagraph in normalized.split('\n')) {
     final paragraph = rawParagraph.trim();
     if (paragraph.isEmpty) {
       lines.add('');

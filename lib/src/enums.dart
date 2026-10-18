@@ -162,13 +162,17 @@ enum TscBarcodeType {
   upcA('UPCA'),
   upcAWithAddon2('UPCA+2'),
   upcAWithAddon5('UPCA+5'),
-  upcE('UPCE13'),
-  upcEWithAddon2('UPCE13+2'),
-  upcEWithAddon5('UPCE13+5'),
+  upcE('UPCE'),
+  upcEWithAddon2('UPCE+2'),
+  upcEWithAddon5('UPCE+5'),
   cpost('CPOST'),
   msi('MSI'),
-  msi1010('MSI10'),
-  msi1110('MSI11'),
+
+  /// MSI with a check digit. TSPL only accepts `MSIC` for checksummed MSI.
+  msi1010('MSIC'),
+
+  /// MSI with a check digit. TSPL only accepts `MSIC` for checksummed MSI.
+  msi1110('MSIC'),
   pleSsey('PLESSEY'),
   itf14('ITF14'),
   ean14('EAN14');

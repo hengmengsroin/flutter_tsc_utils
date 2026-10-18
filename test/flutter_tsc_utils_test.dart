@@ -869,6 +869,138 @@ void main() {
       0x49,
     ]);
   });
+
+  test('barcode symbology tokens match TSPL', () {
+    final preview =
+        (TscGenerator()
+              ..barcode(0, 0, '012345', type: TscBarcodeType.upcE)
+              ..barcode(0, 20, '01234567', type: TscBarcodeType.upcEWithAddon2)
+              ..barcode(
+                0,
+                40,
+                '01234567890',
+                type: TscBarcodeType.upcEWithAddon5,
+              )
+              ..barcode(0, 60, '123456', type: TscBarcodeType.msi1010)
+              ..barcode(0, 80, '123456', type: TscBarcodeType.msi1110))
+            .preview();
+
+    expect(preview, contains('"UPCE"'));
+    expect(preview, contains('"UPCE+2"'));
+    expect(preview, contains('"UPCE+5"'));
+    expect(preview, contains('"MSIC"'));
+    expect(preview, isNot(contains('UPCE13')));
+    expect(preview, isNot(contains('MSI10')));
+    expect(preview, isNot(contains('MSI11')));
+  });
+
+  test('data matrix row and column counts are emitted as a pair', () {
+    expect(
+      () => TscGenerator().dataMatrix(
+        0,
+        0,
+        40,
+        40,
+        'X',
+        options: const TscDataMatrixOptions(columns: 18),
+      ),
+      throwsArgumentError,
+    );
+    expect(
+      () => TscGenerator().dataMatrix(
+        0,
+        0,
+        40,
+        40,
+        'X',
+        options: const TscDataMatrixOptions(rows: 18),
+      ),
+      throwsArgumentError,
+    );
+
+    final paired = TscGenerator().dataMatrix(
+      10,
+      20,
+      80,
+      40,
+      'X',
+      options: const TscDataMatrixOptions(rows: 8, columns: 18),
+    );
+    expect(paired.preview(), contains('DMATRIX 10,20,80,40,R0,A0,8,18,"X"'));
+  });
+
+  test('transparent bitmap pixels stay white', () {
+    final image = img.Image(width: 8, height: 1, numChannels: 4);
+    img.fill(image, color: img.ColorRgba8(0, 0, 0, 0));
+    image.setPixelRgba(1, 0, 0, 0, 0, 255);
+
+    final bytes = (TscGenerator()..bitmap(0, 0, image)).build();
+    const header = 'BITMAP 0,0,1,1,0,';
+    expect(bytes[header.length], 0x40);
+  });
+
+  test('table cells keep explicit line breaks', () async {
+    final generator = TscLabelGenerator(
+      config: const TscLabelConfiguration(printWidth: 300, labelLength: 200),
+      commands: const [
+        TscTable(
+          y: 10,
+          columnWidths: [12],
+          headers: [TscTableHeader('Note')],
+          data: [
+            ['Alpha\r\nBeta'],
+          ],
+          dataFontHeight: 24,
+          dataFontWidth: 16,
+        ),
+      ],
+    );
+
+    final output = await generator.build();
+
+    expect(output, contains('"Alpha"'));
+    expect(output, contains('"Beta"'));
+    expect(output, isNot(contains('"Alpha Beta"')));
+  });
+
+  test('rendered text pixelRatio scales the glyphs', () async {
+    Future<int> lowestInkRow(double pixelRatio) async {
+      final generator = TscGenerator();
+      await generator.khmerText(
+        0,
+        0,
+        'M',
+        options: TscRenderedTextOptions(
+          style: const TextStyle(fontSize: 40, color: Color(0xFF000000)),
+          pixelRatio: pixelRatio,
+          padding: 0,
+          threshold: 200,
+        ),
+      );
+      final bytes = generator.build();
+      final header = latin1.decode(bytes);
+      final match = RegExp(r'BITMAP 0,0,(\d+),(\d+),0,').firstMatch(header);
+      expect(match, isNotNull);
+      final widthBytes = int.parse(match!.group(1)!);
+      final height = int.parse(match.group(2)!);
+      final dataStart = match.end;
+      var lowest = -1;
+      for (var y = 0; y < height; y++) {
+        for (var band = 0; band < widthBytes; band++) {
+          if (bytes[dataStart + y * widthBytes + band] != 0) {
+            lowest = y;
+          }
+        }
+      }
+      return lowest;
+    }
+
+    final unitRatio = await lowestInkRow(1);
+    final doubled = await lowestInkRow(2);
+
+    expect(unitRatio, greaterThan(0));
+    expect(doubled, greaterThan((unitRatio * 1.6).round()));
+  });
 }
 
 String _asciiPrefix(List<int> bytes, {required int maxLength}) {

@@ -1368,12 +1368,35 @@ List<String> _wrapText(
   required int maxWidth,
   required int fontWidth,
 }) {
-  final normalized = text.trim();
+  final normalized = text
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n')
+      .trim();
   if (normalized.isEmpty) {
     return const [''];
   }
 
-  final words = normalized.split(RegExp(r'\s+'));
+  final lines = <String>[];
+  for (final rawParagraph in normalized.split('\n')) {
+    final paragraph = rawParagraph.trim();
+    if (paragraph.isEmpty) {
+      lines.add('');
+      continue;
+    }
+    lines.addAll(
+      _wrapParagraph(paragraph, maxWidth: maxWidth, fontWidth: fontWidth),
+    );
+  }
+
+  return lines.isEmpty ? const [''] : lines;
+}
+
+List<String> _wrapParagraph(
+  String paragraph, {
+  required int maxWidth,
+  required int fontWidth,
+}) {
+  final words = paragraph.split(RegExp(r'\s+'));
   final lines = <String>[];
   var current = '';
 
@@ -1413,7 +1436,7 @@ List<String> _wrapText(
     lines.add(current);
   }
 
-  return lines.isEmpty ? const [''] : lines;
+  return lines;
 }
 
 List<String> _breakLongWord(
